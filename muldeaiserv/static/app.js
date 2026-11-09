@@ -101,6 +101,19 @@
         d.gpus.length + ' GPU(s)</label>').join("")
       : '<p class="muted">Connect devices first. The planner can still show a no-GPU assessment.</p>';
 
+    const rpcExisting = new Map([...byId("rpcWorkers").querySelectorAll("[data-rpc-endpoint]")]
+      .map((input) => [input.dataset.rpcEndpoint, input.value]));
+    const rpcSelected = new Set([...byId("rpcWorkers").querySelectorAll("[data-rpc-device]:checked")]
+      .map((input) => input.value));
+    byId("rpcWorkers").innerHTML = data.devices.length
+      ? data.devices.map((d) => '<div class="rpc-line"><label><input type="checkbox" data-rpc-device value="' +
+          escapeHtml(d.id) + '" ' + (rpcSelected.has(d.id) ? "checked" : "") +
+          '> ' + escapeHtml(d.name) + ' · ' + escapeHtml(d.platform) +
+          (d.online ? ' (online)' : ' (offline)') + '</label><input aria-label="RPC endpoint for ' +
+          escapeHtml(d.name) + '" data-rpc-endpoint="' + escapeHtml(d.id) +
+          '" placeholder="192.168.1.25:50052" value="' +
+          escapeHtml(rpcExisting.get(d.id) ?? "") + '"></div>').join("")
+      : '<div class="empty">Connect a computer agent before planning RPC workers.</div>';
     byId("backendList").innerHTML = data.backends.length
       ? data.backends.map((b) => '<div class="list-row"><div><div class="list-name">' +
         escapeHtml(b.name) + '</div><div class="list-meta">' + escapeHtml(b.model_id) +
@@ -197,6 +210,31 @@
         (p.command ? '<div class="command">' + escapeHtml(p.command) + '</div>' : "") +
         (p.blockers.length ? '<div class="info-band">' + p.blockers.map(escapeHtml).join("<br>") + '</div>' : "") +
         '<ul class="warnings">' + p.warnings.map((w) => '<li>' + escapeHtml(w) + '</li>').join("") + '</ul>';
+    } catch (err) { toast(err.message); }
+  });
+
+  byId("rpcPlanForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const selected = [...byId("rpcWorkers").querySelectorAll("[data-rpc-device]:checked")];
+    if (!selected.length) { toast("Select at least one enrolled device."); return; }
+    const workers = selected.map((cb) => ({
+      device_id: cb.value,
+      endpoint: byId("rpcWorkers").querySelector('[data-rpc-endpoint="' + cb.value + '"]').value.trim()
+    }));
+    try {
+      const plan = await api("/api/plans/llama-rpc", "POST", {
+        model_id: form.get("model_id"), workers,
+        network_acknowledged: byId("rpcAck").checked
+      });
+      byId("rpcPlanResult").innerHTML =
+        '<h3>Experimental RPC topology · ' + plan.worker_count + ' workers</h3>' +
+        plan.workers.map((w) =>
+          '<div class="row"><span>' + escapeHtml(w.name) + '</span><b>' +
+          escapeHtml(w.endpoint) + ' · ' + mb(w.reported_gpu_vram_mb) + ' reported VRAM</b></div>').join("") +
+        (plan.command ? '<div class="command">' + escapeHtml(plan.command) + '</div>' : "") +
+        (plan.blockers.length ? '<div class="info-band">' + plan.blockers.map(escapeHtml).join("<br>") + '</div>' : "") +
+        '<ul class="warnings">' + plan.warnings.map((w) => '<li>' + escapeHtml(w) + '</li>').join("") + '</ul>';
     } catch (err) { toast(err.message); }
   });
 

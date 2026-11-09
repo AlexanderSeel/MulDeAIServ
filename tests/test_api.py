@@ -82,3 +82,19 @@ def test_scoped_inference_key_and_agent_revocation(tmp_path):
         "hardware":HW}).status_code == 401
     assert c.delete("/api/inference-keys/" + key.json()["id"], headers=HEADERS).status_code == 200
     assert c.get("/v1/models", headers=infer_headers).status_code == 401
+
+def test_rpc_planner_endpoint_is_admin_only(tmp_path):
+    c = client(tmp_path)
+    join = c.post("/api/join-tokens",headers=HEADERS,json={}).json()
+    enrolled = c.post("/api/agent/enroll", json={"join_token":join["token"],"hardware":HW}).json()
+    payload = {
+        "model_id":"ggml-org/gemma-3-1b-it-GGUF",
+        "workers":[{"device_id":enrolled["device_id"],"endpoint":"192.168.1.33:50052"}],
+        "network_acknowledged":True
+    }
+    assert c.post("/api/plans/llama-rpc",json=payload).status_code == 401
+    result = c.post("/api/plans/llama-rpc",headers=HEADERS,json=payload)
+    assert result.status_code == 200
+    assert result.json()["can_generate_command"]
+    payload["workers"][0]["endpoint"] = "8.8.8.8:50052"
+    assert c.post("/api/plans/llama-rpc",headers=HEADERS,json=payload).status_code == 422

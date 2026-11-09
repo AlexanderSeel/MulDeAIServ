@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .planner import make_plan
+from .rpc_planner import plan_rpc
 from .storage import DeviceStore
 
 STATIC = Path(__file__).with_name("static")
@@ -48,6 +49,15 @@ class BackendRequest(BaseModel):
     model_id: str = Field(min_length=1, max_length=180)
     base_url: str = Field(min_length=10, max_length=300)
     kind: Literal["vllm", "ollama", "openai-compatible", "exo", "llama-cpp"] = "vllm"
+
+class RpcWorker(BaseModel):
+    device_id: str = Field(min_length=12, max_length=80)
+    endpoint: str = Field(min_length=5, max_length=160)
+
+class RpcPlanRequest(BaseModel):
+    model_id: str
+    workers: list[RpcWorker] = Field(min_length=1, max_length=16)
+    network_acknowledged: bool = False
 
 class InferenceKeyRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
@@ -143,6 +153,14 @@ def create_app(db_path=None, admin_token=None, transport=None):
         try:
             return make_plan(app.state.store.devices(), payload.model_id,
                              payload.parameters_b, payload.quantization_bits, payload.device_ids)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.post("/api/plans/llama-rpc", dependencies=[Depends(require_admin)])
+    def llama_rpc_plan(payload: RpcPlanRequest):
+        try:
+            return plan_rpc(app.state.store.devices(), payload.model_id,
+                            [w.model_dump() for w in payload.workers], payload.network_acknowledged)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 

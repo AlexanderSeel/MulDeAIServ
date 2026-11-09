@@ -81,6 +81,17 @@
             <div id="inferenceKeyList" class="stack"></div>
           </article>
         </div>
+        <article class="panel" id="rpcPlanningPanel">
+          <div class="panel-header"><div><div class="eyebrow">HETEROGENEOUS EXPERIMENT / llama.cpp RPC</div><h2>Remote tensor offload planner</h2></div></div>
+          <p>Design a possible multi-device model split using existing PC workers. This creates instructions only. The upstream RPC protocol is experimental and insecure; never expose it to an open network.</p>
+          <form id="rpcPlanForm" class="form-grid">
+            <label class="full">GGUF model repository (Hugging Face)<input name="model_id" value="ggml-org/gemma-3-1b-it-GGUF" required></label>
+            <div class="full"><div class="field-label">RPC WORKERS & PRIVATE ENDPOINTS</div><div id="rpcWorkers" class="checkbox-list"></div><p class="muted">Choose online paired computers and enter the IP:port where each manually installed ggml-rpc-server will listen. Enrollment alone does not start a worker.</p></div>
+            <label class="full rpc-ack"><input type="checkbox" id="rpcAck" required> I understand RPC is experimental and will be used only on an isolated trusted network.</label>
+            <button class="button primary full" type="submit">Generate RPC instructions →</button>
+          </form>
+          <div id="rpcPlanResult" class="result" aria-live="polite"></div>
+        </article>
         <article class="panel test-panel"><div class="panel-header"><div><div class="eyebrow">INFERENCE SANDBOX</div><h2>Test your model</h2></div></div>
           <form id="chatForm" class="form-grid"><label>Model<select name="model" id="chatModel"></select></label><label class="full">Prompt<textarea name="prompt" rows="3" placeholder="Ask something..." required></textarea></label><button class="button primary" type="submit">Send request →</button></form>
           <pre class="chat-output" id="chatOutput">Select a registered model and send a prompt to test your private inference endpoint.</pre>

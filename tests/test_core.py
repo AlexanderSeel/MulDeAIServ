@@ -83,3 +83,25 @@ def test_inference_key_storage_and_revoke(tmp_path):
     assert "token" not in store.inference_keys()[0]
     assert store.revoke_inference_key(key["id"])
     assert not store.verify_inference_key(key["token"])
+
+def test_rpc_endpoint_validation_and_network_policy():
+    from muldeaiserv.rpc_planner import rpc_endpoint, plan_rpc
+    assert rpc_endpoint("192.168.1.25:50052") == "192.168.1.25:50052"
+    assert rpc_endpoint("[fd12::1]:50052") == "[fd12::1]:50052"
+    for addr in ("8.8.8.8:50052", "169.254.169.254:50052", "https://localhost:50052",
+                 "192.168.1.4", "192.168.1.4:0", "example.org:50052", "10.0.0.1:22/path"):
+        with pytest.raises(ValueError):
+            rpc_endpoint(addr)
+    device = {**HW, "id":"worker1", "online":True, "platform":"windows"}
+    selected = [{"device_id":"worker1","endpoint":"192.168.1.30:50052"}]
+    no_ack = plan_rpc([device], "ggml-org/gemma-3-1b-it-GGUF", selected, False)
+    assert not no_ack["can_generate_command"]
+    ok = plan_rpc([device], "ggml-org/gemma-3-1b-it-GGUF", selected, True)
+    assert ok["can_generate_command"]
+    assert "--rpc 192.168.1.30:50052" in ok["command"]
+    assert ok["workers"][0]["runtime_verified"] is False
+    assert "reported_total_system_ram_mb" in ok
+    offline = plan_rpc([{**device,"online":False}], "ggml-org/gemma-3-1b-it-GGUF", selected, True)
+    assert not offline["can_generate_command"]
+    with pytest.raises(ValueError):
+        plan_rpc([device], "ggml-org/gemma-3-1b-it-GGUF", selected*2, True)
