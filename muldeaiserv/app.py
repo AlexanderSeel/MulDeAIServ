@@ -10,7 +10,7 @@ from typing import Literal
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .diagnostics import collect_runtime
 from .gateway import backend_health, forward_chat
@@ -27,6 +27,12 @@ class GPU(BaseModel):
     memory_mb: int = Field(ge=0, le=2000000)
     free_memory_mb: int | None = Field(default=None, ge=0, le=2000000)
     utilization_percent: int | None = Field(default=None, ge=0, le=100)
+
+    @model_validator(mode="after")
+    def free_memory_not_greater_than_total(self):
+        if self.free_memory_mb is not None and self.free_memory_mb > self.memory_mb:
+            raise ValueError("Reported free GPU memory cannot exceed total GPU memory.")
+        return self
 
 class RuntimeInfo(BaseModel):
     python_version: str | None = Field(default=None, max_length=120)

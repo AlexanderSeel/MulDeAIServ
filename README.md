@@ -77,10 +77,10 @@ In the dashboard open **Setup & diagnostics → Guided installation checklist**,
 
 To generate the same checklist locally in the terminal (no controller necessary after package installation):
 
-\`\`\`powershell
+```powershell
 .\.venv\Scripts\python.exe -m muldeaiserv guide --engine llama-cpp-rpc --platform windows
 .\.venv\Scripts\python.exe -m muldeaiserv guide --engine vllm --platform linux --json
-\`\`\`
+```
 
 A paired agent reports Python version, detected NVIDIA driver, vLLM/Ray Python package versions, Docker executable, optional llama.cpp RPC, Ollama and exo executables, disk free space and NVIDIA GPU utilization/free VRAM when available. A missing component is reported as missing/unverified; detecting its binary **does not** prove that a distributed runtime is functional.
 
@@ -90,7 +90,7 @@ The Models & API screen also supports reviewed llama.cpp RPC worker endpoint pla
 
 Admin users can create revocable **inference-only** bearer tokens in Models & API. The full key appears once, is stored as a hash, and authorizes only OpenAI-compatible inference endpoints, not administrative operations. The administrator may revoke keys or an enrolled device at any time. Device revocation invalidates its heartbeat secret immediately.
 
-The inference proxy supports OpenAI-compatible non-streaming chat and SSE streaming chat, with private-backend redirect refusal. The backend Test button checks the model server's \`/v1/models\` readiness endpoint. These capabilities are still under development; rate limits, backend-specific authentication, full audit logs and production security review are not yet implemented.
+The inference proxy supports OpenAI-compatible non-streaming chat and SSE streaming chat, with private-backend redirect refusal. The backend Test button checks the model server's `/v1/models` readiness endpoint. These capabilities are still under development; rate limits, backend-specific authentication, full audit logs and production security review are not yet implemented.
 
 Reported total VRAM and currently free NVIDIA VRAM are shown separately. The model planner uses conservative heuristics and never guarantees weights/KV cache will fit.
 
@@ -99,4 +99,4 @@ Reported total VRAM and currently free NVIDIA VRAM are shown separately. The mod
 - Runtime diagnostics and setup checklists are **not** automatic installation or cluster execution.
 - Actual multi-node vLLM, exo and llama.cpp RPC integrations must still be validated using compatible hardware and private networking.
 - Android and iOS currently access the browser dashboard; native worker apps are future work.
-- \`MULDEAI_ADMIN_TOKEN\` is still an administrator credential. Use a scoped inference token in external AI clients, and prefer TLS/VPN for all non-local traffic.
+- `MULDEAI_ADMIN_TOKEN` is still an administrator credential. Use a scoped inference token in external AI clients, and prefer TLS/VPN for all non-local traffic.

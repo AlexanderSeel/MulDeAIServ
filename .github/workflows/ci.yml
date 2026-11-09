@@ -24,6 +24,9 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install
         run: python -m pip install -e '.[dev]'
+      - name: JavaScript syntax
+        if: runner.os == 'Linux'
+        run: node --check muldeaiserv/static/app.js
       - name: Compile
         run: python -m compileall -q muldeaiserv
       - name: Tests

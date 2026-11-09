@@ -155,3 +155,18 @@ def test_setup_guides_and_selected_device_runtime(tmp_path):
     assert c.get("/api/setup/guide",params={"device_id":"no-such-device"},
                  headers=HEADERS).status_code == 404
     assert c.get("/api/setup/guide",headers={"Authorization":"Bearer invalid"}).status_code == 401
+
+def test_agent_gpu_telemetry_rejects_impossible_free_memory(tmp_path):
+    c = client(tmp_path)
+    token = c.post("/api/join-tokens", headers=HEADERS, json={}).json()["token"]
+    impossible = {**HW, "gpus":[{"name":"Test","vendor":"nvidia",
+                                  "memory_mb":4096,"free_memory_mb":8192}]}
+    assert c.post("/api/agent/enroll",json={"join_token":token,"hardware":impossible}).status_code == 422
+    valid = {**HW, "gpus":[{"name":"Test","vendor":"nvidia",
+                             "memory_mb":8192,"free_memory_mb":4096}]}
+    assert c.post("/api/agent/enroll",json={"join_token":token,"hardware":valid}).status_code == 200
+
+def test_static_dashboard_resources_served(tmp_path):
+    c = client(tmp_path)
+    assert c.get("/static/app.js").status_code == 200
+    assert c.get("/static/styles.css").status_code == 200
