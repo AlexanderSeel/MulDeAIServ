@@ -264,6 +264,54 @@
     } catch (err) { toast(err.message); }
   });
 
+  byId("ollamaDiscover").addEventListener("click", async () => {
+    const holder = byId("ollamaResults");
+    holder.hidden = false;
+    holder.textContent = "Checking the controller's local Ollama server...";
+    try {
+      const scan = await api("/api/discovery/ollama");
+      if (scan.status !== "available") {
+        holder.textContent = scan.message || "Ollama is not running on this controller.";
+        return;
+      }
+      if (!scan.models.length) {
+        holder.textContent = "Ollama responded, but no models are installed. Pull a model with Ollama first.";
+        return;
+      }
+      holder.innerHTML = '<p class="muted">' + escapeHtml(scan.message) + '</p>' +
+        scan.models.map((m) => {
+          const connected = current?.backends?.some((b) => b.model_id === m.model_id);
+          return '<div class="ollama-model-row"><div><strong>' +
+            escapeHtml(m.model_id) + '</strong><small>' +
+            (m.size_bytes == null ? "Model size not provided" :
+             (m.size_bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB installed") +
+            '</small></div><button type="button" class="button ' +
+            (connected ? "ghost" : "secondary") + ' small" data-register-ollama="' +
+            escapeHtml(m.model_id) + '" ' + (connected ? "disabled" : "") + '>' +
+            (connected ? "Connected" : "Register") + '</button></div>';
+        }).join('') +
+        '<button type="button" class="text-button" id="ollamaOpenStudio">Open AI Studio →</button>';
+    } catch (err) { holder.textContent = err.message; }
+  });
+
+  byId("ollamaResults").addEventListener("click", async (event) => {
+    const openStudio = event.target.closest("#ollamaOpenStudio");
+    if (openStudio) { view("studio"); return; }
+    const button = event.target.closest("[data-register-ollama]");
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    try {
+      const model = button.dataset.registerOllama;
+      await api("/api/backends", "POST", {
+        name: ("Ollama · " + model).slice(0, 100),
+        model_id: model, base_url: "http://127.0.0.1:11434", kind: "ollama"
+      });
+      button.textContent = "Connected";
+      await refresh();
+      toast("Ollama model registered. Open AI Studio to start chatting.");
+    } catch (err) { button.disabled = false; toast(err.message); }
+  });
+
   byId("backendForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);

@@ -263,3 +263,46 @@ def test_studio_rejects_oversized_or_invalid_user_data(tmp_path):
     assert c.post("/api/studio/conversations/unknown/messages", headers=HEADERS,
                   json={"role": "user", "content": "hello"}).status_code == 404
     assert c.get("/api/studio/conversations/unknown", headers=HEADERS).status_code == 404
+
+
+def test_local_ollama_discovery_register_and_chat(tmp_path):
+    def ollama(request):
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [
+                {"name":"qwen2.5:7b","size":4433221100},
+                {"name":"gemma3:4b","size":2500000000},
+                {"name":"../../bad?query","size":5}
+            ]})
+        if request.url.path == "/v1/chat/completions":
+            return httpx.Response(200, json={
+                "choices":[{"message":{"role":"assistant","content":"Hello from Ollama"}}]
+            })
+        return httpx.Response(404)
+    c = client(tmp_path, httpx.MockTransport(ollama))
+    assert c.get("/api/discovery/ollama").status_code == 401
+    discovered = c.get("/api/discovery/ollama", headers=HEADERS)
+    assert discovered.status_code == 200
+    assert discovered.json()["status"] == "available"
+    assert discovered.json()["origin"] == "http://127.0.0.1:11434"
+    assert [m["model_id"] for m in discovered.json()["models"]] == ["qwen2.5:7b","gemma3:4b"]
+    for model in discovered.json()["models"]:
+        result = c.post("/api/backends", headers=HEADERS, json={
+            "name":model["model_id"], "model_id":model["model_id"],
+            "base_url":discovered.json()["origin"],"kind":"ollama"
+        })
+        assert result.status_code == 201
+    chat = c.post("/v1/chat/completions",headers=HEADERS,json={
+        "model":"qwen2.5:7b","messages":[{"role":"user","content":"Hello!"}],"stream":False
+    })
+    assert chat.status_code == 200
+    assert chat.json()["choices"][0]["message"]["content"] == "Hello from Ollama"
+
+
+def test_ollama_discovery_fails_closed_without_backend(tmp_path):
+    def missing(req):
+        raise httpx.ConnectError("connection refused", request=req)
+    c = client(tmp_path, httpx.MockTransport(missing))
+    result = c.get("/api/discovery/ollama", headers=HEADERS)
+    assert result.status_code == 200
+    assert result.json()["status"] == "unavailable"
+    assert result.json()["models"] == []

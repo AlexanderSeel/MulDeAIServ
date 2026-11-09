@@ -169,6 +169,14 @@
             </form><div id="planResult" class="result" aria-live="polite"></div>
           </article>
           <article class="panel"><div class="panel-header"><div><div class="eyebrow">OPENAI-COMPATIBLE GATEWAY</div><h2>Register backend</h2></div></div>
+            <div class="ollama-discovery">
+              <div class="ollama-discovery-head">
+                <div class="ollama-discovery-mark" aria-hidden="true">◉</div>
+                <div><strong>Connect local Ollama</strong><small>Find ready-to-use models on this controller</small></div>
+                <button id="ollamaDiscover" type="button" class="button secondary small">Discover</button>
+              </div>
+              <div id="ollamaResults" class="ollama-discovery-results" aria-live="polite" hidden></div>
+            </div>
             <form id="backendForm" class="form-grid">
               <label class="full">Display name<input name="name" placeholder="Office GPU server" required></label>
               <label class="full">Served model ID<input name="model_id" placeholder="my-local-model" required></label>

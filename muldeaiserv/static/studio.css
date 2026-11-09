@@ -384,3 +384,22 @@
   .studio-orb-ring,.studio-typing-dots i{animation:none!important}
   .studio-suggestion,.metric{transition:none!important}
 }
+
+/* One-click controller-local Ollama connection. */
+.ollama-discovery{margin-bottom:24px;background:linear-gradient(125deg,#18313a,#18283c);
+  border:1px solid #356568;border-radius:13px;padding:14px}
+.ollama-discovery-head{display:flex;align-items:center;gap:10px}
+.ollama-discovery-head>div:nth-child(2){flex:1;min-width:0}
+.ollama-discovery-mark{width:33px;height:33px;display:grid;place-items:center;flex-shrink:0;
+  background:#245151;color:#a2ffee;border-radius:10px;font-size:18px}
+.ollama-discovery-head strong{display:block;font-size:12px;color:#e1fff6}
+.ollama-discovery-head small{display:block;margin-top:4px;font-size:10px;color:#9dafbd}
+.ollama-discovery-results{margin-top:14px;padding-top:11px;border-top:1px solid #38535c;
+  color:#aac3d1;font-size:11px;line-height:1.6}
+.ollama-model-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border-bottom:1px solid #2a4752;padding:9px 0}
+.ollama-model-row:last-of-type{border:0}
+.ollama-model-row>div{min-width:0}
+.ollama-model-row strong{display:block;font-size:11px;color:#dff7f5;overflow-wrap:anywhere}
+.ollama-model-row small{display:block;color:#89a7b1;margin-top:4px}
+.ollama-discovery-results .text-button{margin-top:8px}
