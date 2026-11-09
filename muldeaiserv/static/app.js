@@ -48,6 +48,8 @@
     byId("authOverlay").hidden = false;
     byId("connection").textContent = "Locked";
     byId("adminToken").value = "";
+    byId("newKeyValue").textContent = "";
+    byId("newKeyPanel").hidden = true;
   }
 
   function row(title, subtitle, status, symbol = "◈") {
@@ -88,7 +90,9 @@
         Number(d.cpu_count) + '</strong></div><div class="spec"><small>GPUs</small><strong>' +
         d.gpus.length + '</strong></div></div><div class="device-foot">' +
         (d.gpus.length ? escapeHtml(d.gpus.map((g) => g.name).join(", ")) : "CPU-only device") +
-        ' · Last seen ' + new Date(d.seen * 1000).toLocaleString() + '</div></article>').join("")
+        ' · Last seen ' + new Date(d.seen * 1000).toLocaleString() +
+        '</div><button class="text-button" type="button" data-revoke-device="' +
+        escapeHtml(d.id) + '">Revoke device access</button></article>').join("")
       : '<div class="empty">Your connected computers will appear here with live GPU/RAM telemetry.</div>';
 
     byId("planDevices").innerHTML = data.devices.length
@@ -109,11 +113,24 @@
     if (data.backends.some((b) => b.model_id === selected)) byId("chatModel").value = selected;
   }
 
+  async function refreshKeys() {
+    if (!secret) return;
+    const keys = await api("/api/inference-keys");
+    byId("inferenceKeyList").innerHTML = keys.length
+      ? keys.map((key) => '<div class="list-row"><div><div class="list-name">' +
+          escapeHtml(key.name) + '</div><div class="list-meta">' + escapeHtml(key.prefix) +
+          '… · created ' + new Date(key.created * 1000).toLocaleString() +
+          '</div></div><button class="text-button" data-revoke-key="' +
+          escapeHtml(key.id) + '">Revoke</button></div>').join("")
+      : '<div class="empty">No scoped inference keys yet.</div>';
+  }
+
   async function refresh() {
     if (!secret || refreshBusy) return;
     refreshBusy = true;
     try {
       render(await api("/api/overview"));
+      await refreshKeys();
       byId("connection").textContent = "Controller connected";
     } catch (err) {
       byId("connection").textContent = "Connection failed";
@@ -133,6 +150,7 @@
     try {
       const data = await api("/api/overview");
       render(data);
+      await refreshKeys();
       byId("authOverlay").hidden = true;
       byId("adminToken").value = "";
       byId("connection").textContent = "Controller connected";
@@ -200,6 +218,46 @@
       await api("/api/backends/" + encodeURIComponent(button.dataset.delete), "DELETE");
       await refresh();
       toast("Backend removed.");
+    } catch (err) { toast(err.message); }
+  });
+
+  byId("deviceGrid").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-revoke-device]");
+    if (!button || !confirm("Revoke this device? Its agent will need to enroll again.")) return;
+    try {
+      await api("/api/devices/" + encodeURIComponent(button.dataset.revokeDevice), "DELETE");
+      await refresh();
+      toast("Device credentials revoked.");
+    } catch (err) { toast(err.message); }
+  });
+
+  byId("keyForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const name = new FormData(event.currentTarget).get("name");
+      const result = await api("/api/inference-keys", "POST", { name });
+      byId("newKeyValue").textContent = result.token;
+      byId("newKeyPanel").hidden = false;
+      event.currentTarget.reset();
+      await refreshKeys();
+      toast("Inference-only key created.");
+    } catch (err) { toast(err.message); }
+  });
+
+  byId("copyInferenceKey").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(byId("newKeyValue").textContent); toast("Key copied."); }
+    catch { toast("Copy manually; clipboard access requires a secure origin."); }
+  });
+
+  byId("inferenceKeyList").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-revoke-key]");
+    if (!button || !confirm("Revoke this inference key immediately?")) return;
+    try {
+      await api("/api/inference-keys/" + encodeURIComponent(button.dataset.revokeKey), "DELETE");
+      byId("newKeyValue").textContent = "";
+      byId("newKeyPanel").hidden = true;
+      await refreshKeys();
+      toast("Inference key revoked.");
     } catch (err) { toast(err.message); }
   });
 

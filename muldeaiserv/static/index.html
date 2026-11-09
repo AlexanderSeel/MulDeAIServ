@@ -74,6 +74,11 @@
               <button type="submit" class="button secondary full">+ Add endpoint</button>
             </form>
             <div class="section-title"><h3>Registered endpoints</h3></div><div id="backendList" class="stack"></div>
+            <div class="section-title"><h3>Inference API keys</h3></div>
+            <p class="muted">Create a scoped key for external chat clients. It cannot administer your devices or backends.</p>
+            <form id="keyForm" class="form-grid"><label class="full">Key label<input name="name" placeholder="VS Code / CLI" required maxlength="100"></label><button type="submit" class="button secondary full">+ Create inference key</button></form>
+            <div id="newKeyPanel" hidden><p class="muted">Save this key now. It will not be shown again.</p><div class="command" id="newKeyValue"></div><button class="button secondary small" id="copyInferenceKey" type="button">Copy key</button></div>
+            <div id="inferenceKeyList" class="stack"></div>
           </article>
         </div>
         <article class="panel test-panel"><div class="panel-header"><div><div class="eyebrow">INFERENCE SANDBOX</div><h2>Test your model</h2></div></div>

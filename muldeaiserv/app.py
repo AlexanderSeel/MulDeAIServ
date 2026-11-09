@@ -49,6 +49,9 @@ class BackendRequest(BaseModel):
     base_url: str = Field(min_length=10, max_length=300)
     kind: Literal["vllm", "ollama", "openai-compatible", "exo", "llama-cpp"] = "vllm"
 
+class InferenceKeyRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
 class PlanRequest(BaseModel):
     model_id: str
     parameters_b: float = Field(ge=.1, le=2000)
@@ -69,6 +72,15 @@ def create_app(db_path=None, admin_token=None, transport=None):
             raise HTTPException(401, "Bearer token required.", headers={"WWW-Authenticate": "Bearer"})
         if not secrets.compare_digest(authorization[7:], secret):
             raise HTTPException(401, "Invalid admin token.", headers={"WWW-Authenticate": "Bearer"})
+
+    def require_inference(authorization: str | None = Header(default=None)):
+        secret = app.state.secret
+        if len(secret) < 24:
+            raise HTTPException(503, "Controller admin token not configured.")
+        token = authorization[7:] if authorization and authorization.startswith("Bearer ") else ""
+        if not ((len(token) == len(secret) and secrets.compare_digest(token, secret))
+                or app.state.store.verify_inference_key(token)):
+            raise HTTPException(401, "Invalid inference key.", headers={"WWW-Authenticate": "Bearer"})
 
     @app.get("/api/health")
     def health():
@@ -103,6 +115,29 @@ def create_app(db_path=None, admin_token=None, transport=None):
             raise HTTPException(401, "Agent credentials invalid.")
         return {"accepted": True}
 
+    @app.delete("/api/devices/{device_id}", dependencies=[Depends(require_admin)])
+    def delete_device(device_id: str):
+        if not app.state.store.revoke_device(device_id):
+            raise HTTPException(404, "Device not found.")
+        return {"revoked": True}
+
+    @app.get("/api/inference-keys", dependencies=[Depends(require_admin)])
+    def list_inference_keys():
+        return app.state.store.inference_keys()
+
+    @app.post("/api/inference-keys", dependencies=[Depends(require_admin)], status_code=201)
+    def create_inference_key(payload: InferenceKeyRequest):
+        try:
+            return app.state.store.create_inference_key(payload.name)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.delete("/api/inference-keys/{key_id}", dependencies=[Depends(require_admin)])
+    def revoke_inference_key(key_id: str):
+        if not app.state.store.revoke_inference_key(key_id):
+            raise HTTPException(404, "Key not found.")
+        return {"revoked": True}
+
     @app.post("/api/plans", dependencies=[Depends(require_admin)])
     def plan(payload: PlanRequest):
         try:
@@ -129,13 +164,13 @@ def create_app(db_path=None, admin_token=None, transport=None):
             raise HTTPException(404, "Backend not found.")
         return {"deleted": True}
 
-    @app.get("/v1/models", dependencies=[Depends(require_admin)])
+    @app.get("/v1/models", dependencies=[Depends(require_inference)])
     def models():
         return {"object": "list", "data": [
             {"id": b["model_id"], "object": "model", "owned_by": "muldeaiserv"}
             for b in app.state.store.backends()]}
 
-    @app.post("/v1/chat/completions", dependencies=[Depends(require_admin)])
+    @app.post("/v1/chat/completions", dependencies=[Depends(require_inference)])
     async def chat(payload: dict):
         model_id = payload.get("model")
         if not isinstance(model_id, str) or not isinstance(payload.get("messages"), list):

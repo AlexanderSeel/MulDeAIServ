@@ -62,3 +62,23 @@ def test_invalid_backend_url_cannot_be_registered(tmp_path):
 def test_admin_secret_is_required(tmp_path):
     c = TestClient(create_app(db_path=tmp_path / "unset.db", admin_token=""))
     assert c.get("/api/overview").status_code == 503
+
+def test_scoped_inference_key_and_agent_revocation(tmp_path):
+    c = client(tmp_path)
+    join = c.post("/api/join-tokens", headers=HEADERS, json={}).json()
+    enrolled = c.post("/api/agent/enroll", json={"join_token":join["token"], "hardware":HW}).json()
+    key = c.post("/api/inference-keys", headers=HEADERS, json={"name":"CI client"})
+    assert key.status_code == 201
+    token = key.json()["token"]
+    assert token.startswith("mda_")
+    infer_headers = {"Authorization":"Bearer " + token}
+    assert c.get("/v1/models", headers=infer_headers).status_code == 200
+    assert c.get("/api/overview", headers=infer_headers).status_code == 401
+    keys = c.get("/api/inference-keys", headers=HEADERS).json()
+    assert len(keys) == 1 and "token" not in keys[0] and "digest" not in keys[0]
+    assert c.delete("/api/devices/" + enrolled["device_id"], headers=HEADERS).status_code == 200
+    assert c.post("/api/agent/heartbeat", json={
+        "device_id":enrolled["device_id"],"agent_token":enrolled["agent_token"],
+        "hardware":HW}).status_code == 401
+    assert c.delete("/api/inference-keys/" + key.json()["id"], headers=HEADERS).status_code == 200
+    assert c.get("/v1/models", headers=infer_headers).status_code == 401

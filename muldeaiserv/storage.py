@@ -27,6 +27,9 @@ class DeviceStore:
                 CREATE TABLE IF NOT EXISTS backends(
                     id TEXT PRIMARY KEY,name TEXT NOT NULL,model_id TEXT NOT NULL UNIQUE,
                     base_url TEXT NOT NULL,kind TEXT NOT NULL,created REAL NOT NULL);
+                CREATE TABLE IF NOT EXISTS inference_keys(
+                    id TEXT PRIMARY KEY,name TEXT NOT NULL,digest TEXT NOT NULL UNIQUE,
+                    prefix TEXT NOT NULL,created REAL NOT NULL);
             """)
 
     @contextmanager
@@ -131,4 +134,37 @@ class DeviceStore:
     def delete_backend(self, identifier):
         with self.connection() as db:
             result = db.execute("DELETE FROM backends WHERE id=?", (identifier,))
+            return result.rowcount > 0
+
+    def revoke_device(self, identifier):
+        with self.connection() as db:
+            result = db.execute("DELETE FROM devices WHERE id=?", (identifier,))
+            return result.rowcount > 0
+
+    def create_inference_key(self, name):
+        if not name.strip() or len(name) > 100:
+            raise ValueError("Key name must be 1–100 characters.")
+        token = "mda_" + secrets.token_urlsafe(32)
+        item = {"id": secrets.token_hex(12), "name": name.strip(),
+                "prefix": token[:12], "created": time.time()}
+        with self.connection() as db:
+            db.execute("INSERT INTO inference_keys VALUES (?,?,?,?,?)",
+                       (item["id"], item["name"], digest(token), item["prefix"], item["created"]))
+        return {**item, "token": token}
+
+    def inference_keys(self):
+        with self.connection() as db:
+            return [dict(row) for row in db.execute(
+                "SELECT id,name,prefix,created FROM inference_keys ORDER BY created DESC")]
+
+    def verify_inference_key(self, token):
+        if not token.startswith("mda_") or len(token) > 128:
+            return False
+        with self.connection() as db:
+            row = db.execute("SELECT id FROM inference_keys WHERE digest=?", (digest(token),)).fetchone()
+            return row is not None
+
+    def revoke_inference_key(self, identifier):
+        with self.connection() as db:
+            result = db.execute("DELETE FROM inference_keys WHERE id=?", (identifier,))
             return result.rowcount > 0

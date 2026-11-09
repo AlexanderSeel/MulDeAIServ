@@ -73,3 +73,13 @@ def test_exo_and_llama_cpp_backend_metadata(tmp_path):
     for kind in ('exo', 'llama-cpp'):
         created = store.create_backend(kind, kind + '-test', 'http://127.0.0.1:8001', kind)
         assert created['kind'] == kind
+
+def test_inference_key_storage_and_revoke(tmp_path):
+    store = DeviceStore(tmp_path / "keys.db")
+    key = store.create_inference_key("Agent")
+    assert store.verify_inference_key(key["token"])
+    assert not store.verify_inference_key(key["token"] + "bad")
+    assert "digest" not in store.inference_keys()[0]
+    assert "token" not in store.inference_keys()[0]
+    assert store.revoke_inference_key(key["id"])
+    assert not store.verify_inference_key(key["token"])
