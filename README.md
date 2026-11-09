@@ -1,0 +1,66 @@
+# MulDeAIServ
+
+**Multi-Device AI Service — a private, hardware-aware control plane for local LLMs.**
+
+MulDeAIServ discovers and monitors your computers, helps plan compatible vLLM deployments, and exposes registered local inference backends through one OpenAI-compatible endpoint. It includes a responsive dashboard and a lightweight device agent.
+
+> **Important:** vLLM can distribute model weights across supported GPU nodes using tensor and pipeline parallelism, typically coordinated through Ray. It **cannot** transparently pool arbitrary Windows, iOS, Android, CPU RAM and GPU VRAM into a single address space. Mobile devices are supported as dashboard/chat clients in the first release; experimental mobile compute workers are roadmap items, not shipped capabilities.
+
+## Quick start (Python 3.11+)
+
+```powershell
+# Windows PowerShell
+./scripts/setup.ps1
+$env:MULDEAI_ADMIN_TOKEN = "replace-with-a-long-random-secret"
+.venv/Scripts/python.exe -m muldeaiserv serve
+```
+
+```bash
+# Linux/macOS
+bash scripts/setup.sh
+export MULDEAI_ADMIN_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+.venv/bin/python -m muldeaiserv serve
+```
+
+Open **http://127.0.0.1:8765** and paste your admin token into the dashboard. The server binds to loopback by default. For LAN/mobile access, use an HTTPS reverse proxy or a private VPN; never expose an unencrypted admin token or Ray/vLLM cluster ports to the Internet.
+
+From the dashboard, generate a short-lived join token, then on another Windows/Linux/macOS computer:
+
+```bash
+python -m muldeaiserv.agent --server https://your-private-server --join-token YOUR_JOIN_TOKEN
+```
+
+The agent reports CPU RAM and available GPUs, then sends heartbeats. It does not accept arbitrary remote shell commands.
+
+After running a vLLM or another OpenAI-compatible model server, register its private network URL and model ID under **Backends**. Use `GET /v1/models` and `POST /v1/chat/completions` on MulDeAIServ with the same bearer admin token. vLLM deployments are **planned**, never silently executed.
+
+## Included
+
+- Responsive dashboard for local and LAN clients, including mobile browser UI.
+- Short-lived, single-use device enrollment credentials and per-device heartbeat credentials.
+- OS, RAM and NVIDIA GPU diagnostics; online/offline awareness.
+- Conservative model-weight memory estimates and compatibility-gated vLLM/Ray command generation.
+- Configurable local OpenAI-compatible model backends and authenticated chat proxy.
+- Cross-platform Python CLI, Windows PowerShell and POSIX setup scripts, automated tests.
+- A phased implementation plan in [PLAN.md](PLAN.md).
+
+## Runtime and security
+
+- Python 3.11+; FastAPI, Uvicorn and HTTPX. No Node toolchain required.
+- Set `MULDEAI_ADMIN_TOKEN` before starting; unset/short secrets block privileged endpoints.
+- `MULDEAI_DB_PATH` defaults to `./data/muldeaiserv.db`.
+- Private-IP-literal backend addresses only in v0.1; no direct public Internet proxy endpoints.
+- API keys must be kept secret. Do not publish the dashboard on public HTTP.
+- The application stores backend metadata, device credentials as hashes, and no model weights.
+- vLLM/Ray, GPU drivers, models and high-speed network configuration are separate deployment prerequisites.
+
+## Tests
+
+```bash
+python -m pip install -e ".[dev]"
+pytest -q
+```
+
+See [PLAN.md](PLAN.md) for limitations, architecture, platform support and implementation priorities.
+
+Reference: [vLLM 0.7 distributed serving documentation](https://docs.vllm.ai/en/v0.7.0/serving/distributed_serving.html).
