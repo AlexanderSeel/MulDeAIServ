@@ -68,3 +68,35 @@ Reference: [vLLM 0.7 distributed serving documentation](https://docs.vllm.ai/en/
 ## Heterogeneous runtimes
 
 The gateway can also register existing exo and llama.cpp HTTP model servers. These may support distributing parts of a model across supported devices in their own runtimes, but MulDeAIServ **does not yet install or manage their distributed workers**. See [Heterogeneous engine research](docs/HETEROGENEOUS_ENGINES.md). Current exo documentation focuses on compatible Apple silicon/MLX clusters, while llama.cpp RPC remains experimental and warns against open-network use.
+
+## Setup guide and runtime diagnostics (v0.2 foundation)
+
+MulDeAIServ now provides *non-executing* setup checklists and passive runtime preflight for registered Windows/Linux/macOS devices. The checklist helps distinguish model-server prerequisites from a configured distributed cluster.
+
+In the dashboard open **Setup & diagnostics → Guided installation checklist**, select the engine (controller, vLLM/Ray, llama.cpp RPC or exo) and a registered device or operating system. Review every generated command before using it. This wizard does not install packages or start workers.
+
+To generate the same checklist locally in the terminal (no controller necessary after package installation):
+
+\`\`\`powershell
+.\.venv\Scripts\python.exe -m muldeaiserv guide --engine llama-cpp-rpc --platform windows
+.\.venv\Scripts\python.exe -m muldeaiserv guide --engine vllm --platform linux --json
+\`\`\`
+
+A paired agent reports Python version, detected NVIDIA driver, vLLM/Ray Python package versions, Docker executable, optional llama.cpp RPC, Ollama and exo executables, disk free space and NVIDIA GPU utilization/free VRAM when available. A missing component is reported as missing/unverified; detecting its binary **does not** prove that a distributed runtime is functional.
+
+The Models & API screen also supports reviewed llama.cpp RPC worker endpoint plans (with an isolated-network acknowledgement). This creates a command, **not** a listener, package installation or worker launch. Treat llama.cpp RPC as experimental/insecure and do not use it outside an isolated trusted network.
+
+### API client keys and health
+
+Admin users can create revocable **inference-only** bearer tokens in Models & API. The full key appears once, is stored as a hash, and authorizes only OpenAI-compatible inference endpoints, not administrative operations. The administrator may revoke keys or an enrolled device at any time. Device revocation invalidates its heartbeat secret immediately.
+
+The inference proxy supports OpenAI-compatible non-streaming chat and SSE streaming chat, with private-backend redirect refusal. The backend Test button checks the model server's \`/v1/models\` readiness endpoint. These capabilities are still under development; rate limits, backend-specific authentication, full audit logs and production security review are not yet implemented.
+
+Reported total VRAM and currently free NVIDIA VRAM are shown separately. The model planner uses conservative heuristics and never guarantees weights/KV cache will fit.
+
+### Important limits
+
+- Runtime diagnostics and setup checklists are **not** automatic installation or cluster execution.
+- Actual multi-node vLLM, exo and llama.cpp RPC integrations must still be validated using compatible hardware and private networking.
+- Android and iOS currently access the browser dashboard; native worker apps are future work.
+- \`MULDEAI_ADMIN_TOKEN\` is still an administrator credential. Use a scoped inference token in external AI clients, and prefer TLS/VPN for all non-local traffic.

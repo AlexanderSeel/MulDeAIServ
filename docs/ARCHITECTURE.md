@@ -58,3 +58,16 @@ No messages, prompts or model weights are stored by the controller in v0.1.
 - Genuine distributed vLLM node deployment and link benchmarking.
 - Independently routable llama.cpp/Metal/Vulkan and specialized edge services.
 - Native mobile companion apps and separately verified experimental distributed inference.
+
+## v0.2 additions — diagnostics and scoped access
+
+- The agent includes a fixed, bounded runtime diagnostic report (detected tools and versions, no arbitrary commands, sensitive environment variables or username paths). NVIDIA free VRAM and utilization are optional and reflect a snapshot, not reserved resources.
+- SQLite device migration adds a JSON runtime column; older database records default to empty runtime metadata.
+- The dashboard and CLI expose manual setup instructions for controller, Linux vLLM/Ray, experimental llama.cpp RPC and exo. No remote installation, command execution or RPC port opening occurs.
+- The llama.cpp RPC planner only accepts explicit RFC1918/loopback or IPv6 ULA/loopback endpoints and requires acknowledgement of upstream RPC security limitations. It does not establish a trusted connection, verify a running RPC server, or assert actual usable memory.
+- Hashed inference-only API keys allow GET /v1/models and POST /v1/chat/completions, but not administrative routes. Admins can revoke keys and device credentials. Scoped inference keys are still bearer secrets and must be protected over HTTPS on remote networks.
+- Streaming chat proxies text/event-stream responses, refusing redirects; a bounded JSON response path remains for non-streaming calls.
+- Model-backend readiness is an on-demand GET /v1/models probe against an administrator-registered private IP endpoint. No automatic public probing.
+- Remaining security work: rate limiting, TLS-first authentication, request/stream size limits, audit logs, multi-user RBAC, expiry/rotation of scoped secrets and real device attestation. Do not deploy to hostile/public networks.
+
+Added administrative routes: GET/POST/DELETE /api/inference-keys, DELETE /api/devices/{id}, GET /api/backends/{id}/health, GET /api/setup/guide, POST /api/plans/llama-rpc.

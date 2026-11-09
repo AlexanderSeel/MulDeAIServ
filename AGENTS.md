@@ -25,3 +25,12 @@ Read README.md and PLAN.md before changes. Treat PLAN.md as a living implementat
 2. Dashboard, test coverage, diagnostics and local install.
 3. Authentic Ray/vLLM deployment with dry-run, observability and rollback.
 4. Independent llama.cpp/MLC edge backends and future native mobile-worker research.
+
+
+## Additional validation obligations for setup and telemetry
+
+- Keep the diagnostics allowlist fixed and bounded. Do not remotely run arbitrary commands or accept installation scripts over the device channel.
+- A tool being found on PATH is not proof of runtime readiness; model/driver/network compatibility needs runtime validation.
+- Test migration from old SQLite device schema and ensure credential digests never appear in API payloads.
+- Distinguish reported total GPU VRAM, reported currently free GPU VRAM and actually usable memory. Avoid claiming pooled RAM.
+- Run CI on Windows, Linux and macOS to catch platform-specific bugs, while preserving separate hardware-in-the-loop GPU tests.

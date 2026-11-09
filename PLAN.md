@@ -92,3 +92,21 @@ After each coherent batch run Python compileall, pytest and wheel build. Inspect
 - [ ] Add version-specific exo setup and cluster health detection; current exo release is Apple silicon/MLX focused and Mac/Linux cluster mixing is documented as unsupported.
 - [ ] Add isolated-network-only llama.cpp RPC setup and security safeguards, plus per-device remote memory accounting.
 - [ ] Implement and benchmark verified Android native RPC/MLC integration; investigate iOS separately.
+
+## Progress update — cluster setup / preflight block (2026-11-09)
+
+- [x] Add revocable inference-only bearer credentials separate from administrator access, stored hashed and shown once.
+- [x] Allow administrator to revoke paired agent/device credentials.
+- [x] Add OpenAI-compatible chat SSE passthrough and on-demand backend /v1/models readiness checks.
+- [x] Add experimental llama.cpp RPC topology planner with explicit private IP:port workers and network acknowledgment; **no worker process launch**.
+- [x] Add passive device runtime reporting for Python, driver, Docker, vLLM, Ray, Ollama, llama.cpp RPC, exo and free disk.
+- [x] Persist runtime metadata with migration for older existing SQLite databases.
+- [x] Report measured NVIDIA free GPU VRAM / utilization when supported, separate from total GPU VRAM.
+- [x] Add manual interactive setup checklists for controller, vLLM/Ray, llama.cpp RPC and exo; also available via CLI.
+- [x] Add tests for credentials, device revocation, SSE/health, RPC safety, legacy DB migration, setup guides and measured memory.
+- [ ] True automatic installations, downloads, GPU-driver setup, secured process orchestration and Ray worker control.
+- [ ] Automated model-cache staging with checksums, actual model-fit profiling and hardware performance validation.
+- [ ] Real security hardening: TLS defaults, per-key limits, scope expansion, audit trails, credentials rotation, mobile pairing and production readiness.
+- [ ] Native iOS/Android compute workers or validated heterogeneous pooled model inference; unsupported at this stage.
+
+**Status:** Source and CI validation are not substitutes for real model-server and multi-machine cluster validation. The workflows intentionally cannot claim those checks were run without hardware access.
