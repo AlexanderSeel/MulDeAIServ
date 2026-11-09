@@ -7,14 +7,17 @@
   <title>MulDeAIServ — AI cluster control</title>
   <link rel="manifest" href="/static/manifest.webmanifest">
   <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/studio.css">
   <script src="/static/app.js" defer></script>
+  <script src="/static/studio.js" defer></script>
 </head>
 <body>
 <div class="app-shell">
   <aside class="sidebar">
-    <div class="brand"><div class="brand-icon">M<span>·</span></div><div><strong>MulDeAI<span>Serv</span></strong><small>CONTROL PLANE / v0.1</small></div></div>
+    <div class="brand"><div class="brand-icon">M<span>·</span></div><div><strong>MulDeAI<span>Serv</span></strong><small>CONTROL PLANE / STUDIO</small></div></div>
     <div class="sidebar-label">WORKSPACE</div>
     <nav class="nav" aria-label="Main">
+      <button data-tab="studio" class="nav-link studio-nav"><span class="nav-icon">✳</span> AI Studio</button>
       <button data-tab="overview" class="nav-link active"><span class="nav-icon">◫</span> Overview</button>
       <button data-tab="devices" class="nav-link"><span class="nav-icon">⌘</span> Device network</button>
       <button data-tab="models" class="nav-link"><span class="nav-icon">◈</span> Models & API</button>
@@ -22,7 +25,7 @@
     </nav>
     <div class="sidebar-bottom">
       <div class="edge-label"><span class="signal"></span> PRIVATE CONTROL PLANE</div>
-      <p>Cluster control, not magical pooled RAM. Only compatible GPU nodes can shard a model through vLLM.</p>
+      <p>Manage devices, models and conversations in one private AI workspace. GPU sharding still depends on compatible runtimes.</p>
       <button id="lockButton" class="text-button">Lock dashboard</button>
     </div>
   </aside>
@@ -32,8 +35,108 @@
       <div class="top-actions"><span class="mini-status"><span class="signal"></span> <span id="connection">Connecting</span></span><button class="button ghost small" id="refreshButton">↻ Refresh</button></div>
     </header>
     <div class="content">
+
+      <section data-view="studio" class="view studio-view">
+        <div class="studio-shell">
+          <aside class="studio-history" aria-label="Saved AI conversations">
+            <div class="studio-history-heading">
+              <div>
+                <div class="eyebrow">PERSONAL WORKSPACE</div>
+                <h2>Conversations</h2>
+              </div>
+              <button id="studioNew" type="button" class="studio-new-button" title="New conversation" aria-label="New conversation">+</button>
+            </div>
+            <div class="studio-search">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+              <label class="sr-only" for="studioSearch">Search conversations</label>
+              <input id="studioSearch" type="search" placeholder="Search your chats…" autocomplete="off">
+            </div>
+            <div class="studio-conversation-list" id="studioConversations">
+              <div class="studio-history-empty">Unlock the dashboard to load your conversations.</div>
+            </div>
+            <div class="studio-history-footer">
+              <div class="studio-private"><span class="studio-private-dot"></span> YOUR PRIVATE WORKSPACE</div>
+              <p>Chats are stored on this controller. Delete them at any time. They are not synchronized to a cloud account.</p>
+              <button type="button" id="studioClearChat" class="studio-subtle-button">Clear current chat</button>
+            </div>
+          </aside>
+
+          <div class="studio-main">
+            <div class="studio-topbar">
+              <div class="studio-brand-label">
+                <span class="studio-top-icon" aria-hidden="true">✳</span>
+                <div><span class="studio-kicker">AI STUDIO</span><strong>MulDeAI Assistant</strong></div>
+              </div>
+              <div class="studio-model-controls">
+                <label class="sr-only" for="studioModel">Select connected AI model</label>
+                <select id="studioModel" aria-label="Select AI model"><option value="">No model registered</option></select>
+                <span class="studio-model-status" id="studioStatus">Connect a model</span>
+                <button id="studioExport" class="studio-icon-button" title="Export chat as Markdown" aria-label="Export chat" type="button">⇩</button>
+                <button id="studioRename" class="studio-icon-button" title="Rename chat" aria-label="Rename chat" type="button">✎</button>
+              </div>
+            </div>
+
+            <div class="studio-feed" id="studioFeed">
+              <div class="studio-welcome" id="studioWelcome">
+                <div class="studio-orb" aria-hidden="true">
+                  <div class="studio-orb-ring ring-one"></div>
+                  <div class="studio-orb-ring ring-two"></div>
+                  <div class="studio-orb-center">✳</div>
+                  <div class="studio-orb-star star-one"></div>
+                  <div class="studio-orb-star star-two"></div>
+                </div>
+                <div class="eyebrow">ONE SPACE · YOUR ENTIRE AI NETWORK</div>
+                <h1>Make room for<br><span>better ideas.</span></h1>
+                <p>Explore, write, code and create with your own connected models. Your conversations stay on your controller.</p>
+                <div class="studio-suggestion-grid" aria-label="Suggested prompts">
+                  <button type="button" class="studio-suggestion" data-starter="Explain how to split an LLM across my connected computers, including realistic memory and network requirements."><span class="suggestion-glyph">⌘</span><span><strong>Understand my cluster</strong><small>Distributed AI, simply explained</small></span><span class="suggestion-arrow">↗</span></button>
+                  <button type="button" class="studio-suggestion" data-starter="Help me design a secure local AI assistant that can answer technical questions and write production-ready code."><span class="suggestion-glyph">✧</span><span><strong>Build something new</strong><small>Architecture, code and workflows</small></span><span class="suggestion-arrow">↗</span></button>
+                  <button type="button" class="studio-suggestion" data-starter="Compare model quantization trade-offs for local inference. Explain context, speed, VRAM and accuracy."><span class="suggestion-glyph">◈</span><span><strong>Choose a local model</strong><small>Quality, memory and performance</small></span><span class="suggestion-arrow">↗</span></button>
+                  <button type="button" class="studio-suggestion" data-starter="Brainstorm three useful personal projects I can build with multiple local AI devices."><span class="suggestion-glyph">◎</span><span><strong>Explore possibilities</strong><small>Turn an idea into a plan</small></span><span class="suggestion-arrow">↗</span></button>
+                </div>
+              </div>
+              <div id="studioMessages" class="studio-messages" aria-live="polite" aria-label="Conversation messages"></div>
+            </div>
+
+            <div class="studio-compose-wrap">
+              <div id="studioNotice" class="studio-notice" role="status" aria-live="polite" hidden></div>
+              <div class="studio-settings" id="studioSettings" hidden>
+                <div class="studio-settings-title">
+                  <strong>Response settings</strong>
+                  <span>Settings are applied to the next prompt.</span>
+                </div>
+                <div class="studio-settings-grid">
+                  <label>Temperature <span id="studioTempValue">0.7</span>
+                    <input id="studioTemperature" type="range" min="0" max="2" step="0.1" value="0.7">
+                  </label>
+                  <label>Max output tokens
+                    <input id="studioMaxTokens" type="number" min="64" max="8192" step="64" value="1024">
+                  </label>
+                  <label class="studio-settings-wide">System instructions
+                    <textarea id="studioSystemPrompt" rows="2" maxlength="8000" placeholder="Optional: Tell your AI how to respond…"></textarea>
+                  </label>
+                  <label class="studio-setting-checkbox"><input id="studioStreaming" type="checkbox" checked> Stream tokens as generated</label>
+                </div>
+              </div>
+              <form id="studioComposer" class="studio-composer">
+                <label class="sr-only" for="studioPrompt">Message your selected local AI model</label>
+                <textarea id="studioPrompt" rows="2" maxlength="32768" placeholder="Ask anything. Your AI is ready when a model is connected…" spellcheck="true" required></textarea>
+                <div class="studio-composer-bottom">
+                  <div class="studio-composer-left">
+                    <button id="studioSettingsToggle" type="button" class="studio-settings-button" aria-expanded="false" aria-controls="studioSettings">⚙ <span>Settings</span></button>
+                    <span class="studio-composer-hint">Enter to send · Shift+Enter for a new line</span>
+                  </div>
+                  <button id="studioSend" class="studio-send-button" type="submit"><span>Send message</span><span aria-hidden="true">↑</span></button>
+                  <button id="studioStop" class="studio-stop-button" type="button" hidden>■ Stop response</button>
+                </div>
+              </form>
+              <div class="studio-disclaimer">Powered by your connected models · Answers may contain errors · Review important information</div>
+            </div>
+          </div>
+        </div>
+      </section>
       <section data-view="overview" class="view active">
-        <div class="page-heading"><div><div class="eyebrow">DISTRIBUTED INTELLIGENCE / OPERATIONS</div><h1>Your AI cluster, <em>in focus.</em></h1><p>Discover your devices, evaluate model feasibility and unify local inference endpoints.</p></div><button class="button primary" data-go="devices">+ Connect device</button></div>
+        <div class="page-heading"><div><div class="eyebrow">DISTRIBUTED INTELLIGENCE / OPERATIONS</div><h1>Your AI cluster, <em>in focus.</em></h1><p>Discover your devices, evaluate model feasibility and unify local inference endpoints.</p></div><div class="overview-hero-actions"><button class="button primary" data-go="studio">✳ Open AI Studio</button><button class="button ghost" data-go="devices">+ Connect device</button></div></div>
         <div class="metric-grid">
           <div class="metric"><div class="metric-title">CONNECTED NODES <span>◉</span></div><div class="metric-value" id="statNodes">—</div><small id="statNodesHint">Waiting for device data</small></div>
           <div class="metric"><div class="metric-title">REPORTED GPU VRAM <span>◈</span></div><div class="metric-value" id="statVRAM">—</div><small id="statVRAMHint">Reported total · not shared RAM</small></div>
