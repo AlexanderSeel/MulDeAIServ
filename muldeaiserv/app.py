@@ -18,6 +18,7 @@ from .planner import make_plan
 from .rpc_planner import plan_rpc
 from .setup_guide import make_setup_guide
 from .storage import DeviceStore
+from .studio_store import StudioStore
 
 STATIC = Path(__file__).with_name("static")
 
@@ -87,6 +88,22 @@ class RpcPlanRequest(BaseModel):
 class InferenceKeyRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
+class StudioConversationCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    model_id: str = Field(min_length=1, max_length=180)
+    system_prompt: str = Field(default="", max_length=8000)
+    temperature: float = Field(default=0.7, ge=0, le=2)
+
+class StudioConversationUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    model_id: str | None = Field(default=None, min_length=1, max_length=180)
+    system_prompt: str | None = Field(default=None, max_length=8000)
+    temperature: float | None = Field(default=None, ge=0, le=2)
+
+class StudioMessageCreate(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=32768)
+
 class PlanRequest(BaseModel):
     model_id: str
     parameters_b: float = Field(ge=.1, le=2000)
@@ -98,6 +115,7 @@ def create_app(db_path=None, admin_token=None, transport=None):
     app.state.store = DeviceStore(db_path or os.getenv("MULDEAI_DB_PATH", "./data/muldeaiserv.db"))
     app.state.secret = admin_token if admin_token is not None else os.getenv("MULDEAI_ADMIN_TOKEN", "")
     app.state.transport = transport
+    app.state.studio = StudioStore(app.state.store)
 
     def require_admin(authorization: str | None = Header(default=None)):
         secret = app.state.secret
@@ -227,6 +245,60 @@ def create_app(db_path=None, admin_token=None, transport=None):
     def delete_backend(backend_id: str):
         if not app.state.store.delete_backend(backend_id):
             raise HTTPException(404, "Backend not found.")
+        return {"deleted": True}
+
+    @app.get("/api/studio/conversations", dependencies=[Depends(require_admin)])
+    def studio_list():
+        return app.state.studio.list()
+
+    @app.post("/api/studio/conversations", status_code=201, dependencies=[Depends(require_admin)])
+    def studio_create(payload: StudioConversationCreate):
+        if app.state.store.backend_for_model(payload.model_id) is None:
+            raise HTTPException(422, "Choose a registered model before starting a chat.")
+        try:
+            return app.state.studio.create(
+                payload.title, payload.model_id, payload.system_prompt, payload.temperature
+            )
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.get("/api/studio/conversations/{conversation_id}", dependencies=[Depends(require_admin)])
+    def studio_get(conversation_id: str):
+        result = app.state.studio.get(conversation_id)
+        if result is None:
+            raise HTTPException(404, "Conversation not found.")
+        return result
+
+    @app.patch("/api/studio/conversations/{conversation_id}", dependencies=[Depends(require_admin)])
+    def studio_update(conversation_id: str, payload: StudioConversationUpdate):
+        changes = payload.model_dump(exclude_unset=True)
+        if any(value is None for value in changes.values()):
+            raise HTTPException(422, "Conversation values cannot be null.")
+        if "model_id" in changes and app.state.store.backend_for_model(changes["model_id"]) is None:
+            raise HTTPException(422, "Choose a registered model.")
+        try:
+            result = app.state.studio.update(conversation_id, **changes)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        if result is None:
+            raise HTTPException(404, "Conversation not found.")
+        return result
+
+    @app.post("/api/studio/conversations/{conversation_id}/messages", status_code=201,
+              dependencies=[Depends(require_admin)])
+    def studio_message(conversation_id: str, payload: StudioMessageCreate):
+        try:
+            result = app.state.studio.add_message(conversation_id, payload.role, payload.content)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        if result is None:
+            raise HTTPException(404, "Conversation not found.")
+        return result
+
+    @app.delete("/api/studio/conversations/{conversation_id}", dependencies=[Depends(require_admin)])
+    def studio_delete(conversation_id: str):
+        if not app.state.studio.delete(conversation_id):
+            raise HTTPException(404, "Conversation not found.")
         return {"deleted": True}
 
     @app.get("/v1/models", dependencies=[Depends(require_inference)])
