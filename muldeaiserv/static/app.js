@@ -36,9 +36,10 @@
     document.querySelectorAll("[data-view]").forEach((x) => x.classList.toggle("active", x.dataset.view === name));
     document.querySelectorAll("[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
     byId("breadcrumb").textContent = {
-      overview: "Overview", devices: "Device network", models: "Models & API", setup: "Setup"
+      studio: "AI Studio", overview: "Overview", devices: "Device network", models: "Models & API", setup: "Setup"
     }[name] || name;
     window.scrollTo({ top: 0, behavior: "smooth" });
+    window.dispatchEvent(new CustomEvent("muldeai:view", {detail: name}));
   }
 
   function lock() {
@@ -50,6 +51,7 @@
     byId("adminToken").value = "";
     byId("newKeyValue").textContent = "";
     byId("newKeyPanel").hidden = true;
+    window.dispatchEvent(new Event("muldeai:locked"));
   }
 
   function row(title, subtitle, status, symbol = "◈") {
@@ -145,6 +147,7 @@
     byId("chatModel").innerHTML = data.backends.map((b) =>
       '<option value="' + escapeHtml(b.model_id) + '">' + escapeHtml(b.model_id) + '</option>').join("");
     if (data.backends.some((b) => b.model_id === selected)) byId("chatModel").value = selected;
+    window.dispatchEvent(new CustomEvent("muldeai:models", {detail: data.backends}));
   }
 
   async function refreshKeys() {
@@ -188,6 +191,7 @@
       byId("authOverlay").hidden = true;
       byId("adminToken").value = "";
       byId("connection").textContent = "Controller connected";
+      window.dispatchEvent(new Event("muldeai:unlocked"));
     } catch (err) {
       byId("authError").textContent = err.message;
       secret = "";
@@ -432,6 +436,33 @@
         "Free disk: " + mb(d.runtime?.disk_free_mb), "", d.note
       ].join("\n");
     } catch (err) { toast(err.message); }
+  });
+
+  window.MulDeAI = Object.freeze({
+    request: api,
+    openTab: view,
+    streamChat: async (body, signal) => {
+      if (!secret) throw Error("Unlock the dashboard first.");
+      let response;
+      try {
+        response = await fetch("/v1/chat/completions", {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + secret, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal
+        });
+      } catch (error) {
+        if (error.name === "AbortError") throw error;
+        throw Error("Unable to reach the AI model gateway.");
+      }
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        if (response.status === 401) lock();
+        throw Error(typeof result.detail === "string" ? result.detail :
+          "Model request failed (" + response.status + ").");
+      }
+      return response;
+    }
   });
 
   fetch("/api/health").then((r) => r.json()).then((d) => {
