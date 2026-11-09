@@ -35,7 +35,12 @@ def make_plan(devices, model_id, parameters_b, bits, device_ids=None):
         blockers.append("All selected nodes must expose the same number of GPUs in this template.")
     gpu_count = sum(counts)
     vram = sum(g["memory_mb"] for d in nodes for g in d["gpus"])
-    usable = round(vram * .75)
+    all_gpus = [g for d in nodes for g in d["gpus"]]
+    known_free = len(all_gpus) > 0 and all(
+        g.get("free_memory_mb") is not None for g in all_gpus
+    )
+    free_vram = sum(g["free_memory_mb"] for g in all_gpus) if known_free else None
+    usable = min(round(vram * .75), round(free_vram * .90)) if known_free else round(vram * .75)
     estimated = round(parameters_b * 1e9 * bits / 8 / (1024**2) * 1.25)
     fits = gpu_count > 0 and estimated <= usable
     tp = counts[0] if counts else 0
@@ -48,13 +53,14 @@ def make_plan(devices, model_id, parameters_b, bits, device_ids=None):
     return {
         "model_id":model_id,"parameters_b":parameters_b,"quantization_bits":bits,
         "node_count":pp,"gpu_count":gpu_count,"total_gpu_vram_mb":vram,
-        "conservative_usable_vram_mb":usable,"estimated_model_weights_mb":estimated,
+        "conservative_usable_vram_mb":usable,"reported_free_vram_mb":free_vram,
+        "estimated_model_weights_mb":estimated,
         "likely_fits_weights_only":fits,"can_generate_command":not blockers,
         "tensor_parallel_size":tp,"pipeline_parallel_size":pp,"command":command,
         "blockers":blockers,
         "warnings":[
             "VRAM is summed for a rough feasibility check; it is not a shared memory address space.",
-            "Includes an estimated 25% model-weight overhead and reserves 25% GPU memory; not a fit guarantee.",
+            "Includes an estimated 25% model-weight overhead. Reserves 25% of total VRAM; when all free-memory reports exist, also limits to 90% of reported free VRAM.",
             "KV cache, activations, runtime support, model architecture and communication speed can change feasibility.",
             "Every node needs matching drivers, vLLM environment and model files; multi-node Ray must be configured separately.",
             "iOS, Android and CPU RAM do not participate in this vLLM GPU configuration."

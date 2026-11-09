@@ -25,6 +25,8 @@ class GPU(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     vendor: str = Field(min_length=1, max_length=40)
     memory_mb: int = Field(ge=0, le=2000000)
+    free_memory_mb: int | None = Field(default=None, ge=0, le=2000000)
+    utilization_percent: int | None = Field(default=None, ge=0, le=100)
 
 class RuntimeInfo(BaseModel):
     python_version: str | None = Field(default=None, max_length=120)

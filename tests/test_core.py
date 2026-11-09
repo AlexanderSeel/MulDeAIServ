@@ -132,3 +132,25 @@ def test_manual_setup_guides_distinguish_unsupported_platforms():
     rpc = make_setup_guide("llama-cpp-rpc","linux")
     assert rpc["supported"]
     assert rpc["mode"] == "manual_review_only"
+
+def test_free_vram_budgets_only_when_all_nodes_report_it():
+    from muldeaiserv.planner import make_plan
+    gpu = {"name":"NVIDIA demo","vendor":"nvidia","memory_mb":24576,
+           "free_memory_mb":2048,"utilization_percent":84}
+    device = {**HW,"gpus":[gpu],"id":"node", "online":True}
+    plan = make_plan([device],"example/8b",8,4)
+    assert plan["reported_free_vram_mb"] == 2048
+    assert plan["conservative_usable_vram_mb"] == round(2048*.9)
+    legacy = {**device,"gpus":[{k:v for k,v in gpu.items() if k != "free_memory_mb"}]}
+    assert make_plan([legacy],"example/8b",8,4)["reported_free_vram_mb"] is None
+
+def test_nvidia_gpu_query_with_free_memory(monkeypatch):
+    from muldeaiserv.agent import nvidia_gpus
+    from types import SimpleNamespace
+    monkeypatch.setattr("muldeaiserv.agent.subprocess.run",lambda *a,**kw:
+                        SimpleNamespace(stdout="NVIDIA GPU, 12288, 8192, 33\\n"))
+    gpus = nvidia_gpus()
+    assert len(gpus) == 1
+    assert gpus[0]["memory_mb"] == 12288
+    assert gpus[0]["free_memory_mb"] == 8192
+    assert gpus[0]["utilization_percent"] == 33

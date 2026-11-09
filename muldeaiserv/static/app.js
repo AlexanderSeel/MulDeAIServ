@@ -66,6 +66,8 @@
     byId("statNodes").textContent = stats.online_devices + " / " + stats.total_devices;
     byId("statNodesHint").textContent = stats.online_devices + " nodes actively reporting";
     byId("statVRAM").textContent = mb(stats.gpu_vram_mb);
+    byId("statVRAMHint").textContent = stats.gpu_free_reporting === stats.gpu_count && stats.gpu_count > 0
+      ? mb(stats.gpu_free_vram_mb) + " free reported (not pooled)" : "Reported total · not shared RAM";
     byId("statRAM").textContent = mb(stats.cpu_ram_mb);
     byId("statModels").textContent = stats.backends;
     byId("deviceTotal").textContent = data.devices.length + " registered";
@@ -95,6 +97,8 @@
         (d.readiness?.vllm_candidate ? 'vLLM GPU candidate' : 'Not a vLLM GPU node') +
         (d.readiness?.vllm_runtime_verified ? ' · driver/runtime detected' : ' · runtime not verified') +
         '</p><small>' + escapeHtml((d.runtime?.cuda_driver ? 'NVIDIA driver ' + d.runtime.cuda_driver : 'CUDA driver unverified') +
+        (d.gpus.some((g) => g.free_memory_mb != null) ? ' · Free GPU VRAM ' +
+          mb(d.gpus.reduce((sum, g) => sum + (g.free_memory_mb ?? 0), 0)) : '') +
         (d.runtime?.docker_present ? ' · Docker available' : '') +
         (d.runtime?.rpc_server_present ? ' · RPC server found' : '') +
         (d.runtime?.exo_present ? ' · exo found' : '') +
@@ -220,6 +224,7 @@
       byId("planResult").innerHTML = '<h3>Deployment estimate</h3>' +
         [['Selected nodes', p.node_count], ['Available GPUs', p.gpu_count],
           ['Reported VRAM', mb(p.total_gpu_vram_mb)],
+          ['Reported free VRAM', p.reported_free_vram_mb == null ? "Unknown" : mb(p.reported_free_vram_mb)],
           ['Conservative VRAM budget', mb(p.conservative_usable_vram_mb)],
           ['Estimated weight requirement', mb(p.estimated_model_weights_mb)],
           ['Weight estimate within budget', p.likely_fits_weights_only ? "LIKELY" : "NO"]]

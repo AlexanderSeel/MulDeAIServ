@@ -115,6 +115,10 @@ class DeviceStore:
             "online_devices":len(online),"total_devices":len(devices),
             "cpu_ram_mb":sum(d["ram_mb"] for d in online),
             "gpu_vram_mb":sum(g["memory_mb"] for d in online for g in d["gpus"]),
+            "gpu_free_vram_mb":sum(g["free_memory_mb"] for d in online for g in d["gpus"]
+                                   if g.get("free_memory_mb") is not None),
+            "gpu_free_reporting":sum(1 for d in online for g in d["gpus"]
+                                     if g.get("free_memory_mb") is not None),
             "gpu_count":sum(len(d["gpus"]) for d in online),
             "backends":len(backends)}}
 

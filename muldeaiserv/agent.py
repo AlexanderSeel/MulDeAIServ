@@ -40,19 +40,37 @@ def ram_mb():
     except (OSError, ValueError, AttributeError):
         return 0
 
+def nvidia_gpus():
+    """Report exact NVIDIA capacity, and optional *currently free* VRAM."""
+    for columns in ("name,memory.total,memory.free,utilization.gpu", "name,memory.total"):
+        try:
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=" + columns, "--format=csv,noheader,nounits"],
+                text=True, capture_output=True, timeout=5, check=True,
+                stdin=subprocess.DEVNULL)
+            gpus = []
+            for line in result.stdout.splitlines():
+                parts = [p.strip() for p in line.rsplit(",", 3 if columns.count(",") == 3 else 1)]
+                if len(parts) != (4 if columns.count(",") == 3 else 2):
+                    continue
+                name, total = parts[:2]
+                if not total.isdigit():
+                    continue
+                gpu = {"name":name[:160], "vendor":"nvidia", "memory_mb":int(total)}
+                if len(parts) == 4:
+                    if parts[2].isdigit():
+                        gpu["free_memory_mb"] = int(parts[2])
+                    if parts[3].isdigit():
+                        gpu["utilization_percent"] = min(100, int(parts[3]))
+                gpus.append(gpu)
+            if gpus:
+                return gpus
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+    return []
+
 def probe(name=None):
-    gpus = []
-    try:
-        result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
-            text=True, capture_output=True, timeout=5, check=True)
-        for line in result.stdout.splitlines():
-            if "," not in line:
-                continue
-            gpu_name, memory = line.rsplit(",", 1)
-            gpus.append({"name":gpu_name.strip(),"vendor":"nvidia","memory_mb":int(memory.strip())})
-    except (OSError, ValueError, subprocess.SubprocessError):
-        pass
+    gpus = nvidia_gpus()
     system = platform.system().lower()
     return {"name": name or socket.gethostname(), "platform":system if system in
             ("windows","linux","darwin") else "other",
