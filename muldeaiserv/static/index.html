@@ -94,6 +94,11 @@
                   <button type="button" class="studio-suggestion" data-starter="Compare model quantization trade-offs for local inference. Explain context, speed, VRAM and accuracy."><span class="suggestion-glyph">◈</span><span><strong>Choose a local model</strong><small>Quality, memory and performance</small></span><span class="suggestion-arrow">↗</span></button>
                   <button type="button" class="studio-suggestion" data-starter="Brainstorm three useful personal projects I can build with multiple local AI devices."><span class="suggestion-glyph">◎</span><span><strong>Explore possibilities</strong><small>Turn an idea into a plan</small></span><span class="suggestion-arrow">↗</span></button>
                 </div>
+                <div class="studio-onboarding" id="studioNoModels" hidden>
+                  <strong>No connected AI model yet?</strong>
+                  <span>Discover models from Ollama running on this computer, or register a private vLLM, exo or llama.cpp server.</span>
+                  <button type="button" class="button secondary small" data-go="models">Connect an AI model →</button>
+                </div>
               </div>
               <div id="studioMessages" class="studio-messages" aria-live="polite" aria-label="Conversation messages"></div>
             </div>

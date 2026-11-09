@@ -168,8 +168,15 @@ def test_agent_gpu_telemetry_rejects_impossible_free_memory(tmp_path):
 
 def test_static_dashboard_resources_served(tmp_path):
     c = client(tmp_path)
+    page = c.get("/").text
+    assert 'data-view="studio"' in page
+    assert 'id="studioModel"' in page
+    assert 'id="studioComposer"' in page
+    assert 'id="ollamaDiscover"' in page
     assert c.get("/static/app.js").status_code == 200
     assert c.get("/static/styles.css").status_code == 200
+    assert c.get("/static/studio.js").status_code == 200
+    assert c.get("/static/studio.css").status_code == 200
 
 
 def test_studio_chat_lifecycle_persists_and_is_private(tmp_path):

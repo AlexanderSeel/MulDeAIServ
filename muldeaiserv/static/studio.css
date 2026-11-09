@@ -403,3 +403,10 @@
 .ollama-model-row strong{display:block;font-size:11px;color:#dff7f5;overflow-wrap:anywhere}
 .ollama-model-row small{display:block;color:#89a7b1;margin-top:4px}
 .ollama-discovery-results .text-button{margin-top:8px}
+
+.studio-onboarding{display:grid;justify-items:center;gap:9px;margin:15px auto 0;
+  max-width:490px;background:linear-gradient(130deg,#1d3746,#202a46);
+  border:1px solid #48827f;border-radius:14px;padding:16px}
+.studio-onboarding strong{font-size:13px;color:#dcfff6}
+.studio-onboarding span{font-size:11px;color:#a9c2cc;line-height:1.5}
+.studio-onboarding .button{margin-top:3px}

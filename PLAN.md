@@ -110,3 +110,24 @@ After each coherent batch run Python compileall, pytest and wheel build. Inspect
 - [ ] Native iOS/Android compute workers or validated heterogeneous pooled model inference; unsupported at this stage.
 
 **Status:** Source and CI validation are not substitutes for real model-server and multi-machine cluster validation. The workflows intentionally cannot claim those checks were run without hardware access.
+
+
+## AI Studio UI / usability milestone (2026-11-09)
+
+- [x] Add a dedicated, responsive AI Studio workspace accessible from the existing dashboard.
+- [x] Add controller-persisted chat conversations with list/search/reopen/update/delete, ordered user/assistant messages and schema migrations for existing installs.
+- [x] Add multi-turn model chat with per-chat model selection, optional system instructions and generation parameters.
+- [x] Connect existing SSE/non-streaming OpenAI-compatible gateway to the AI Studio.
+- [x] Add stop-generation control, human-readable error feedback, sample prompts, quick copying, Markdown export and conversation rename.
+- [x] Keep rendered model output safe from HTML injection by using DOM text nodes and explicit code-block elements.
+- [x] Add controller-local Ollama discovery and one-click registration using the existing backend registry and private API origin.
+- [x] Update authentication boundary tests: inference-only keys cannot read or modify chat history.
+- [x] Add SQLite conversation lifecycle/restart/cascade-delete tests, Ollama discovery tests and static UI smoke checks.
+- [x] Add Node.js syntax validation for both dashboard and AI Studio scripts.
+- [ ] Run real browser visual-regression and accessibility audits on desktop/mobile devices.
+- [ ] Add visual topology graph, deployment controls and verified hardware-running multi-node model inference.
+- [ ] Add local chat encryption, separate user accounts and per-user access policies before broader multi-user deployment.
+- [ ] Add chat search across message bodies, editable history, token usage accounting and backend-aware context limits.
+- [ ] Add native mobile apps and validated mobile compute workers; mobile browser UI alone does not provide AI model memory.
+
+This feature requires an already-running model server. Chat history lives on the controller as plaintext SQLite and must be protected accordingly.

@@ -15,6 +15,7 @@
     feed: el("studioFeed"),
     model: el("studioModel"),
     status: el("studioStatus"),
+    noModels: el("studioNoModels"),
     rename: el("studioRename"),
     export: el("studioExport"),
     prompt: el("studioPrompt"),
@@ -248,6 +249,7 @@
 
   function setModels(backends) {
     state.backends = Array.isArray(backends) ? backends.filter((b) => b.model_id) : [];
+    ui.noModels.hidden = state.backends.length > 0;
     const selected = ui.model.value;
     const sessionModel = state.active?.model_id;
     ui.model.replaceChildren();

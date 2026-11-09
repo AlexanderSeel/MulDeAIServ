@@ -112,7 +112,7 @@ class PlanRequest(BaseModel):
     device_ids: list[str] | None = None
 
 def create_app(db_path=None, admin_token=None, transport=None):
-    app = FastAPI(title="MulDeAIServ", version="0.1.0", docs_url=None, redoc_url=None)
+    app = FastAPI(title="MulDeAIServ", version="0.2.0", docs_url=None, redoc_url=None)
     app.state.store = DeviceStore(db_path or os.getenv("MULDEAI_DB_PATH", "./data/muldeaiserv.db"))
     app.state.secret = admin_token if admin_token is not None else os.getenv("MULDEAI_ADMIN_TOKEN", "")
     app.state.transport = transport

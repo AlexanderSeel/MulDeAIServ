@@ -26,7 +26,9 @@ jobs:
         run: python -m pip install -e '.[dev]'
       - name: JavaScript syntax
         if: runner.os == 'Linux'
-        run: node --check muldeaiserv/static/app.js
+        run: |
+          node --check muldeaiserv/static/app.js
+          node --check muldeaiserv/static/studio.js
       - name: Compile
         run: python -m compileall -q muldeaiserv
       - name: Tests

@@ -100,3 +100,21 @@ Reported total VRAM and currently free NVIDIA VRAM are shown separately. The mod
 - Actual multi-node vLLM, exo and llama.cpp RPC integrations must still be validated using compatible hardware and private networking.
 - Android and iOS currently access the browser dashboard; native worker apps are future work.
 - `MULDEAI_ADMIN_TOKEN` is still an administrator credential. Use a scoped inference token in external AI clients, and prefer TLS/VPN for all non-local traffic.
+
+
+## AI Studio — chat with your connected models
+
+Open the dashboard at http://127.0.0.1:8765 and select **AI Studio**. This is an actual multi-turn chat client for the registered model endpoints, not a preview or mock. You can:
+
+- Choose a connected vLLM, Ollama, llama.cpp HTTP or exo model.
+- Send prompts with optional system instructions, model temperature and output token budget.
+- Stream token responses when the selected backend supports OpenAI-compatible SSE, or switch to regular non-streaming chat.
+- Start, reopen, search, rename and delete conversations stored in the controller's SQLite database.
+- Stop a streaming generation and export an existing conversation as Markdown.
+- Switch back to Overview, Device network, Models & API, or Setup & diagnostics without losing the saved conversation history.
+
+**First-run shortcut:** In **Models & API**, choose **Connect local Ollama → Discover**. MulDeAIServ queries only the controller's own http://127.0.0.1:11434/api/tags endpoint. If Ollama is running and models are installed, select **Register** next to a model, then open **AI Studio**. For other model servers, register the private API origin and its served model ID manually.
+
+**Privacy:** Saved chat titles, prompts, system instructions and AI responses are stored **unencrypted** in the controller's local SQLite database. Protect the data directory and system backups. No chat history is sent to a third-party server by MulDeAIServ itself, but your configured model backend receives chat prompts and history. Conversations require the admin token; inference-only API keys cannot read saved chats. Currently the chat sends up to the 40 most recent stored user/assistant messages to the model. Local generation still requires an actual running inference backend. See [AI Studio guide](docs/AI_STUDIO.md).
+
+**Scope:** The web dashboard manages registered nodes, backend endpoints and setup plans. It does not yet deploy distributed vLLM/Ray/exo/llama.cpp RPC workers or combine arbitrary Android/iOS memory into a single RAM pool.
