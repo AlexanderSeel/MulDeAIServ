@@ -103,6 +103,23 @@
       <section data-view="setup" class="view">
         <div class="page-heading"><div><div class="eyebrow">GETTING STARTED / SYSTEM</div><h1>Setup & <em>diagnostics.</em></h1><p>Install the controller, enroll worker nodes and configure your inference runtime.</p></div><button class="button secondary" id="checkDoctor">Run diagnostics</button></div>
         <div class="panel-grid"><article class="panel"><div class="eyebrow">01 / CONTROLLER</div><h2>Install and launch</h2><p>Python 3.11+ and private network connectivity are required.</p><div class="command">python -m pip install -e .<br>python -m muldeaiserv serve</div><p class="muted">For LAN binding use --host 0.0.0.0 --allow-lan, with a strong admin token and preferably an HTTPS reverse proxy.</p></article><article class="panel"><div class="eyebrow">02 / AGENT</div><h2>Connect computing devices</h2><p>Generate a single-use token on the Device network page. Then run the agent from each Windows/Linux/macOS host.</p><div class="command">python -m muldeaiserv.agent --server &lt;controller-origin&gt; --join-token &lt;token&gt;</div><p class="muted">iOS/Android currently use this browser interface. Native mobile inference workers are not yet implemented.</p></article></div>
+        <article class="panel"><div class="eyebrow">INTERACTIVE SETUP / NON-EXECUTING</div><h2>Guided installation checklist</h2><p>Select a runtime and target computer to obtain platform-specific, reviewable setup instructions. No commands are executed by this interface.</p>
+          <form id="setupGuideForm" class="form-grid">
+            <label>Inference engine<select name="engine" id="guideEngine">
+              <option value="controller">MulDeAIServ controller</option>
+              <option value="vllm">vLLM / Ray (GPU)</option>
+              <option value="llama-cpp-rpc">llama.cpp RPC (experimental)</option>
+              <option value="exo">exo (Apple silicon)</option>
+            </select></label>
+            <label>Target computer<select id="guideDevice" name="device_id"><option value="">This / new computer</option></select></label>
+            <label>Operating system (when no device selected)<select name="platform_name" id="guidePlatform">
+              <option value="windows">Windows</option><option value="linux">Linux</option><option value="darwin">macOS</option>
+              <option value="android">Android</option><option value="ios">iOS</option>
+            </select></label>
+            <button type="submit" class="button secondary">Generate setup checklist →</button>
+          </form>
+          <div id="setupGuideResult" aria-live="polite"></div>
+        </article>
         <article class="panel"><div class="eyebrow">03 / DISTRIBUTED MODELS</div><h2>Prepare a vLLM cluster</h2><p>For one model split across GPUs: use Linux GPU hosts, identical vLLM container/runtime environments, fast networking, and Ray for multi-node execution. Model files must be available at consistent paths. The planner generates a command but does not deploy it.</p><div id="doctorOutput" class="diagnostics">Run diagnostics to inspect controller-host dependencies.</div></article>
         <article class="panel"><div class="eyebrow">ENGINE RESEARCH / HETEROGENEOUS DEVICES</div><h2>Other cluster runtimes</h2><p>exo supports real model splitting on compatible Apple silicon MLX clusters; llama.cpp RPC offers experimental cross-device tensor offloading. Neither is installed or orchestrated automatically. Native Android/iOS memory sharing is not available in this release. See <a href="https://github.com/exo-explore/exo" target="_blank" rel="noopener">exo</a>, <a href="https://github.com/ggml-org/llama.cpp/blob/master/tools/rpc/README.md" target="_blank" rel="noopener">llama.cpp RPC</a> and the repository engine research notes.</p></article><p class="muted foot-note">Security: no default public API access, no remote shell execution, no direct public-backend URLs. vLLM documentation: <a href="https://docs.vllm.ai/en/v0.7.0/serving/distributed_serving.html" target="_blank" rel="noopener">Distributed serving guide ↗</a></p>
       </section>

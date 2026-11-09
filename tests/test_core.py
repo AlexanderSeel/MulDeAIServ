@@ -105,3 +105,30 @@ def test_rpc_endpoint_validation_and_network_policy():
     assert not offline["can_generate_command"]
     with pytest.raises(ValueError):
         plan_rpc([device], "ggml-org/gemma-3-1b-it-GGUF", selected*2, True)
+
+def test_runtime_diagnostics_persist_and_old_database_migrates(tmp_path):
+    import sqlite3
+    file = tmp_path / "old.db"
+    with sqlite3.connect(file) as db:
+        db.execute("CREATE TABLE devices (id TEXT PRIMARY KEY,name TEXT NOT NULL,platform TEXT NOT NULL,os_version TEXT NOT NULL,cpu_count INTEGER NOT NULL,ram_mb INTEGER NOT NULL,gpus TEXT NOT NULL,agent_digest TEXT NOT NULL,created REAL NOT NULL,seen REAL NOT NULL)")
+    store = DeviceStore(file)
+    hw = {**HW, "runtime":{"cuda_driver":"550.60","docker_present":True,"rpc_server_present":True}}
+    session = store.enroll(store.create_join()["token"],hw)
+    device = store.devices()[0]
+    assert device["runtime"]["cuda_driver"] == "550.60"
+    assert device["readiness"]["vllm_runtime_verified"]
+    assert device["readiness"]["rpc_worker_candidate"]
+    assert store.heartbeat(session["device_id"],session["agent_token"],{**HW})
+    assert store.devices()[0]["runtime"] == {}
+
+def test_manual_setup_guides_distinguish_unsupported_platforms():
+    from muldeaiserv.setup_guide import make_setup_guide
+    controller = make_setup_guide("controller","windows")
+    assert controller["supported"]
+    assert any("setup.ps1" in (s["command"] or "") for s in controller["steps"])
+    assert not make_setup_guide("vllm","android")["supported"]
+    assert not make_setup_guide("exo","windows")["supported"]
+    assert make_setup_guide("exo","darwin")["supported"]
+    rpc = make_setup_guide("llama-cpp-rpc","linux")
+    assert rpc["supported"]
+    assert rpc["mode"] == "manual_review_only"

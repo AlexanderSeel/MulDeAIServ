@@ -137,3 +137,21 @@ def test_readiness_reports_unreachable_without_disclosing_internal_error(tmp_pat
     assert result.status_code == 200
     assert result.json()["status"] == "unreachable"
     assert "sensitive" not in str(result.json())
+
+def test_setup_guides_and_selected_device_runtime(tmp_path):
+    c = client(tmp_path)
+    r = c.get("/api/setup/guide", params={"engine":"exo","platform_name":"windows"}, headers=HEADERS)
+    assert r.status_code == 200
+    assert not r.json()["supported"]
+    token = c.post("/api/join-tokens",headers=HEADERS,json={}).json()["token"]
+    hw = {**HW,"runtime":{"cuda_driver":"550.60","docker_present":True,"python_version":"3.11.9"}}
+    session = c.post("/api/agent/enroll",json={"join_token":token,"hardware":hw}).json()
+    resp = c.get("/api/setup/guide",params={
+        "engine":"vllm","platform_name":"windows","device_id":session["device_id"]
+    },headers=HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["platform"] == "linux"
+    assert resp.json()["supported"]
+    assert c.get("/api/setup/guide",params={"device_id":"no-such-device"},
+                 headers=HEADERS).status_code == 404
+    assert c.get("/api/setup/guide",headers={"Authorization":"Bearer invalid"}).status_code == 401

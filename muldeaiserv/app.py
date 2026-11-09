@@ -16,6 +16,7 @@ from .diagnostics import collect_runtime
 from .gateway import backend_health, forward_chat
 from .planner import make_plan
 from .rpc_planner import plan_rpc
+from .setup_guide import make_setup_guide
 from .storage import DeviceStore
 
 STATIC = Path(__file__).with_name("static")
@@ -123,6 +124,20 @@ def create_app(db_path=None, admin_token=None, transport=None):
                 "vllm": bool(shutil.which("vllm")), "nvidia_smi": bool(shutil.which("nvidia-smi")),
                 "runtime": collect_runtime(),
                 "note": "These checks describe the controller host only. They do not install or configure GPU runtimes."}
+
+    @app.get("/api/setup/guide", dependencies=[Depends(require_admin)])
+    def setup_guide(engine: Literal["controller", "vllm", "llama-cpp-rpc", "exo"] = "controller",
+                    platform_name: Literal["windows", "linux", "darwin", "android", "ios", "other"] = "linux",
+                    device_id: str | None = None):
+        runtime = collect_runtime()
+        system = platform_name
+        if device_id:
+            device = next((d for d in app.state.store.devices() if d["id"] == device_id), None)
+            if device is None:
+                raise HTTPException(404, "Device not found.")
+            system = device["platform"]
+            runtime = device.get("runtime") or {}
+        return make_setup_guide(engine, system, runtime)
 
     @app.post("/api/join-tokens", dependencies=[Depends(require_admin)])
     def join(payload: JoinRequest):

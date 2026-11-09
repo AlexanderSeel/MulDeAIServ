@@ -91,9 +91,25 @@
         d.gpus.length + '</strong></div></div><div class="device-foot">' +
         (d.gpus.length ? escapeHtml(d.gpus.map((g) => g.name).join(", ")) : "CPU-only device") +
         ' · Last seen ' + new Date(d.seen * 1000).toLocaleString() +
-        '</div><button class="text-button" type="button" data-revoke-device="' +
+        '</div><div class="runtime-details"><strong>Runtime readiness</strong><p>' +
+        (d.readiness?.vllm_candidate ? 'vLLM GPU candidate' : 'Not a vLLM GPU node') +
+        (d.readiness?.vllm_runtime_verified ? ' · driver/runtime detected' : ' · runtime not verified') +
+        '</p><small>' + escapeHtml((d.runtime?.cuda_driver ? 'NVIDIA driver ' + d.runtime.cuda_driver : 'CUDA driver unverified') +
+        (d.runtime?.docker_present ? ' · Docker available' : '') +
+        (d.runtime?.rpc_server_present ? ' · RPC server found' : '') +
+        (d.runtime?.exo_present ? ' · exo found' : '') +
+        (d.runtime?.vllm_version ? ' · vLLM ' + d.runtime.vllm_version : '')) +
+        '</small></div><button class="text-button" type="button" data-revoke-device="' +
         escapeHtml(d.id) + '">Revoke device access</button></article>').join("")
       : '<div class="empty">Your connected computers will appear here with live GPU/RAM telemetry.</div>';
+
+    const guidePreviouslySelected = byId("guideDevice").value;
+    byId("guideDevice").innerHTML = '<option value="">This / new computer</option>' +
+      data.devices.map((d) => '<option value="' + escapeHtml(d.id) + '">' +
+        escapeHtml(d.name) + ' · ' + escapeHtml(d.platform) + (d.online ? '' : ' (offline)') +
+        '</option>').join("");
+    if (data.devices.some((d) => d.id === guidePreviouslySelected))
+      byId("guideDevice").value = guidePreviouslySelected;
 
     byId("planDevices").innerHTML = data.devices.length
       ? data.devices.map((d) => '<label><input type="checkbox" value="' + escapeHtml(d.id) +
@@ -364,6 +380,36 @@
     } catch (err) { output.textContent += "\n" + err.message; }
   });
 
+  byId("setupGuideForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const params = new URLSearchParams();
+    params.set("engine", form.get("engine"));
+    params.set("platform_name", form.get("platform_name"));
+    if (form.get("device_id")) params.set("device_id", form.get("device_id"));
+    const target = byId("setupGuideResult");
+    target.textContent = "Preparing checklist...";
+    try {
+      const guide = await api("/api/setup/guide?" + params);
+      target.innerHTML = '<div class="info-band">' +
+        (guide.supported ? 'Manual checklist ready. No changes have been made to the device.' :
+          '<strong>Unsupported target</strong> ' + guide.blockers.map(escapeHtml).join('; ')) +
+        '</div>' +
+        guide.steps.map((step, index) =>
+          '<section class="guide-step"><div class="eyebrow">STEP ' + (index + 1) +
+          ' / ' + guide.steps.length + '</div><h3>' + escapeHtml(step.title) + '</h3><p>' +
+          escapeHtml(step.note) + '</p>' +
+          (step.command ? '<div class="command">' + escapeHtml(step.command) + '</div>' : '') +
+          (step.detected == null ? '' : '<small class="muted">' +
+           (step.detected ? 'Dependency reported on selected device' : 'Dependency not detected') +
+           '</small>') + '</section>').join('') +
+        '<ul class="warnings">' + guide.warnings.map((w) => '<li>' +
+        escapeHtml(w) + '</li>').join('') + '</ul>';
+    } catch (err) {
+      target.textContent = err.message;
+    }
+  });
+
   byId("checkDoctor").addEventListener("click", async () => {
     try {
       const d = await api("/api/doctor");
@@ -372,7 +418,13 @@
         "Docker: " + (d.docker ? "found" : "not on PATH"),
         "Ray: " + (d.ray ? "found" : "not on PATH"),
         "vLLM: " + (d.vllm ? "found" : "not on PATH"),
-        "NVIDIA-SMI: " + (d.nvidia_smi ? "found" : "not on PATH"), "", d.note
+        "NVIDIA-SMI: " + (d.nvidia_smi ? "found" : "not on PATH"),
+        "Driver version: " + (d.runtime?.cuda_driver || "unverified"),
+        "vLLM: " + (d.runtime?.vllm_version || "not installed in controller Python"),
+        "Ray: " + (d.runtime?.ray_version || "not installed in controller Python"),
+        "llama.cpp RPC: " + (d.runtime?.rpc_server_present ? "binary found" : "not detected"),
+        "exo: " + (d.runtime?.exo_present ? "binary found" : "not detected"),
+        "Free disk: " + mb(d.runtime?.disk_free_mb), "", d.note
       ].join("\n");
     } catch (err) { toast(err.message); }
   });
