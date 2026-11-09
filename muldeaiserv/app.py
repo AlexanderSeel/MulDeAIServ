@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from .diagnostics import collect_runtime
 from .gateway import backend_health, forward_chat
+from .ollama_discovery import discover_local_ollama
 from .planner import make_plan
 from .rpc_planner import plan_rpc
 from .setup_guide import make_setup_guide
@@ -221,6 +222,10 @@ def create_app(db_path=None, admin_token=None, transport=None):
                             [w.model_dump() for w in payload.workers], payload.network_acknowledged)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
+
+    @app.get("/api/discovery/ollama", dependencies=[Depends(require_admin)])
+    async def discover_ollama():
+        return await discover_local_ollama(app.state.transport)
 
     @app.get("/api/backends", dependencies=[Depends(require_admin)])
     def backends():
