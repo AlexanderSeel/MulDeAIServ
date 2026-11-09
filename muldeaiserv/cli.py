@@ -1,5 +1,7 @@
 """Local setup diagnostics and safe controller startup."""
 import argparse
+import json
+import platform
 import os
 import secrets
 import shutil
@@ -13,7 +15,31 @@ def main(argv=None):
     serve.add_argument("--port", type=int, default=8765)
     serve.add_argument("--allow-lan", action="store_true")
     commands.add_parser("doctor", help="Check local runtime dependencies")
+    guide = commands.add_parser("guide", help="Print manual setup instructions for an engine")
+    guide.add_argument("--engine", choices=("controller","vllm","llama-cpp-rpc","exo"),
+                       default="controller")
+    guide.add_argument("--platform", choices=("windows","linux","darwin","android","ios","other"),
+                       default=platform.system().lower() if platform.system().lower() in
+                       ("windows","linux","darwin") else "other")
+    guide.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    if args.command == "guide":
+        from .setup_guide import make_setup_guide
+        from .diagnostics import collect_runtime
+        result = make_setup_guide(args.engine, args.platform, collect_runtime())
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"Engine: {result['engine']} | platform: {result['platform']} | mode: manual review only")
+            for problem in result["blockers"]:
+                print("BLOCKER:", problem)
+            for index, step in enumerate(result["steps"], 1):
+                print(f"\n{index}. {step['title']}\n   {step['note']}")
+                if step["command"]:
+                    print("   $", step["command"])
+            for warning in result["warnings"]:
+                print("WARNING:", warning)
+        return 0 if result["supported"] else 2
     if args.command == "doctor":
         from .agent import probe
         from .diagnostics import readiness

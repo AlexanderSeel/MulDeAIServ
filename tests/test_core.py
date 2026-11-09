@@ -154,3 +154,14 @@ def test_nvidia_gpu_query_with_free_memory(monkeypatch):
     assert gpus[0]["memory_mb"] == 12288
     assert gpus[0]["free_memory_mb"] == 8192
     assert gpus[0]["utilization_percent"] == 33
+
+def test_cli_guide_is_offline_and_machine_readable(capsys):
+    import json
+    from muldeaiserv.cli import main
+    assert main(["guide", "--engine", "controller", "--platform", "windows", "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["supported"]
+    assert report["mode"] == "manual_review_only"
+    assert main(["guide", "--engine", "vllm", "--platform", "android", "--json"]) == 2
+    report = json.loads(capsys.readouterr().out)
+    assert not report["supported"]
