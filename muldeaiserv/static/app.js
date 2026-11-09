@@ -118,7 +118,8 @@
       ? data.backends.map((b) => '<div class="list-row"><div><div class="list-name">' +
         escapeHtml(b.name) + '</div><div class="list-meta">' + escapeHtml(b.model_id) +
         ' · ' + escapeHtml(b.base_url) + '</div></div><button class="text-button" data-delete="' +
-        escapeHtml(b.id) + '" aria-label="Remove backend">Remove</button></div>').join("")
+        escapeHtml(b.id) + '" aria-label="Remove backend">Remove</button><button class="text-button" data-test-backend="' +
+        escapeHtml(b.id) + '">Test</button></div>').join("")
       : '<div class="empty">No inference backend connected.</div>';
     const selected = byId("chatModel").value;
     byId("chatModel").innerHTML = data.backends.map((b) =>
@@ -250,12 +251,18 @@
   });
 
   byId("backendList").addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-delete]");
-    if (!button) return;
+    const test = event.target.closest("[data-test-backend]");
+    const remove = event.target.closest("[data-delete]");
     try {
-      await api("/api/backends/" + encodeURIComponent(button.dataset.delete), "DELETE");
-      await refresh();
-      toast("Backend removed.");
+      if (test) {
+        const report = await api("/api/backends/" + encodeURIComponent(test.dataset.testBackend) + "/health");
+        toast("Backend: " + report.status + (report.model_count == null ? "" : " · " + report.model_count + " models") +
+          (report.reason ? " · " + report.reason : ""));
+      } else if (remove && confirm("Remove this model backend?")) {
+        await api("/api/backends/" + encodeURIComponent(remove.dataset.delete), "DELETE");
+        await refresh();
+        toast("Backend removed.");
+      }
     } catch (err) { toast(err.message); }
   });
 
@@ -304,14 +311,57 @@
     const form = new FormData(event.currentTarget);
     const output = byId("chatOutput");
     output.textContent = "Generating response...";
+    const streaming = byId("chatStream").checked;
+    const payload = {
+      model: form.get("model"),
+      messages: [{ role: "user", content: form.get("prompt") }],
+      stream: streaming
+    };
     try {
-      const result = await api("/v1/chat/completions", "POST", {
-        model: form.get("model"),
-        messages: [{ role: "user", content: form.get("prompt") }],
-        stream: false
+      if (!streaming) {
+        const result = await api("/v1/chat/completions", "POST", payload);
+        output.textContent = result.choices?.[0]?.message?.content ?? JSON.stringify(result, null, 2);
+        return;
+      }
+      const response = await fetch("/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + secret, "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
-      output.textContent = result.choices?.[0]?.message?.content ?? JSON.stringify(result, null, 2);
-    } catch (err) { output.textContent = err.message; }
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw Error(data.detail || "Streaming request failed (" + response.status + ")");
+      }
+      if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream"))
+        throw Error("Backend returned no event stream.");
+      output.textContent = "";
+      let buffer = "", full = "";
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let ended = false;
+      while (!ended) {
+        const {value, done} = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done }).replace(/\r\n/g, "\n");
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
+        for (const eventText of events) {
+          for (const line of eventText.split("\n")) {
+            if (!line.startsWith("data:")) continue;
+            const dataText = line.slice(5).trim();
+            if (dataText === "[DONE]") { ended = true; break; }
+            let chunk;
+            try { chunk = JSON.parse(dataText); } catch { continue; }
+            const delta = chunk.choices?.[0]?.delta?.content;
+            if (typeof delta === "string") full += delta;
+            if (chunk.error) throw Error(chunk.error.message || "Upstream stream error.");
+          }
+          if (ended) break;
+        }
+        output.textContent = full || (ended ? "(empty response)" : "Generating response...");
+        if (done) break;
+      }
+      if (ended) await reader.cancel();
+    } catch (err) { output.textContent += "\n" + err.message; }
   });
 
   byId("checkDoctor").addEventListener("click", async () => {

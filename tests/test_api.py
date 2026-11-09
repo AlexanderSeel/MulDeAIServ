@@ -50,7 +50,7 @@ def test_chat_proxy_uses_configured_backend_without_forwarding_admin_token(tmp_p
     assert str(captured[0].url) == "http://127.0.0.1:8001/v1/chat/completions"
     assert "authorization" not in captured[0].headers
     assert c.post("/v1/chat/completions",headers=HEADERS,
-        json={"model":"local-test","messages":[],"stream":True}).status_code == 422
+        json={"model":"local-test","messages":[],"stream":True}).status_code == 502
     assert c.delete("/api/backends/" + created.json()["id"],headers=HEADERS).status_code == 200
 
 def test_invalid_backend_url_cannot_be_registered(tmp_path):
@@ -98,3 +98,42 @@ def test_rpc_planner_endpoint_is_admin_only(tmp_path):
     assert result.json()["can_generate_command"]
     payload["workers"][0]["endpoint"] = "8.8.8.8:50052"
     assert c.post("/api/plans/llama-rpc",headers=HEADERS,json=payload).status_code == 422
+
+def test_sse_proxy_streams_and_backend_probe(tmp_path):
+    requests = []
+    def upstream(req):
+        requests.append(req)
+        if req.method == "GET":
+            return httpx.Response(200, json={"object":"list","data":[{"id":"local-test"}]})
+        return httpx.Response(
+            200, headers={"content-type":"text/event-stream"},
+            content=b'data: {"choices":[{"delta":{"content":"hello"}}]}\\n\\n'
+                    b'data: {"choices":[{"delta":{"content":" world"}}]}\\n\\n'
+                    b'data: [DONE]\\n\\n'
+        )
+    c = client(tmp_path, httpx.MockTransport(upstream))
+    item = c.post("/api/backends", headers=HEADERS, json={
+        "name":"Local","model_id":"local-test","base_url":"http://127.0.0.1:8001","kind":"llama-cpp"
+    }).json()
+    health = c.get("/api/backends/" + item["id"] + "/health", headers=HEADERS)
+    assert health.json() == {"status":"healthy","model_count":1}
+    with c.stream("POST","/v1/chat/completions", headers=HEADERS,
+                  json={"model":"local-test","messages":[],"stream":True}) as reply:
+        body = reply.read().decode()
+        assert reply.status_code == 200
+        assert "text/event-stream" in reply.headers["content-type"]
+        assert "hello" in body and "[DONE]" in body
+    assert len(requests) == 2
+    assert "authorization" not in requests[-1].headers
+
+def test_readiness_reports_unreachable_without_disclosing_internal_error(tmp_path):
+    def failed(req):
+        raise httpx.ConnectError("sensitive internal detail",request=req)
+    c = client(tmp_path, httpx.MockTransport(failed))
+    item = c.post("/api/backends", headers=HEADERS, json={
+        "name":"Down","model_id":"model-down","base_url":"http://127.0.0.1:8001","kind":"vllm"
+    }).json()
+    result = c.get("/api/backends/" + item["id"] + "/health", headers=HEADERS)
+    assert result.status_code == 200
+    assert result.json()["status"] == "unreachable"
+    assert "sensitive" not in str(result.json())

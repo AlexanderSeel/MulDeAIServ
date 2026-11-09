@@ -93,7 +93,9 @@
           <div id="rpcPlanResult" class="result" aria-live="polite"></div>
         </article>
         <article class="panel test-panel"><div class="panel-header"><div><div class="eyebrow">INFERENCE SANDBOX</div><h2>Test your model</h2></div></div>
-          <form id="chatForm" class="form-grid"><label>Model<select name="model" id="chatModel"></select></label><label class="full">Prompt<textarea name="prompt" rows="3" placeholder="Ask something..." required></textarea></label><button class="button primary" type="submit">Send request →</button></form>
+          <form id="chatForm" class="form-grid"><label>Model<select name="model" id="chatModel"></select></label><label class="full">Prompt<textarea name="prompt" rows="3" placeholder="Ask something..." required></textarea></label>
+          <label class="full rpc-ack"><input type="checkbox" id="chatStream" checked> Stream tokens as they arrive (SSE)</label>
+          <button class="button primary" type="submit">Send request →</button></form>
           <pre class="chat-output" id="chatOutput">Select a registered model and send a prompt to test your private inference endpoint.</pre>
         </article>
       </section>

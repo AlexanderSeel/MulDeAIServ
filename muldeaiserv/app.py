@@ -7,12 +7,12 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .gateway import backend_health, forward_chat
 from .planner import make_plan
 from .rpc_planner import plan_rpc
 from .storage import DeviceStore
@@ -176,6 +176,13 @@ def create_app(db_path=None, admin_token=None, transport=None):
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
+    @app.get("/api/backends/{backend_id}/health", dependencies=[Depends(require_admin)])
+    async def check_backend_health(backend_id: str):
+        backend = next((b for b in app.state.store.backends() if b["id"] == backend_id), None)
+        if backend is None:
+            raise HTTPException(404, "Backend not found.")
+        return await backend_health(backend["base_url"], app.state.transport)
+
     @app.delete("/api/backends/{backend_id}", dependencies=[Depends(require_admin)])
     def delete_backend(backend_id: str):
         if not app.state.store.delete_backend(backend_id):
@@ -193,18 +200,10 @@ def create_app(db_path=None, admin_token=None, transport=None):
         model_id = payload.get("model")
         if not isinstance(model_id, str) or not isinstance(payload.get("messages"), list):
             raise HTTPException(422, "Supply model and messages.")
-        if payload.get("stream"):
-            raise HTTPException(422, "Streaming proxy support is not implemented in v0.1.")
         backend = app.state.store.backend_for_model(model_id)
         if not backend:
             raise HTTPException(404, "Model not registered.")
-        try:
-            async with httpx.AsyncClient(timeout=120, follow_redirects=False,
-                                         trust_env=False, transport=app.state.transport) as client:
-                response = await client.post(backend["base_url"] + "/v1/chat/completions", json=payload)
-            return JSONResponse(response.json(), status_code=response.status_code)
-        except (httpx.RequestError, ValueError) as exc:
-            raise HTTPException(502, "Model backend unavailable or returned invalid JSON.") from exc
+        return await forward_chat(backend["base_url"], payload, app.state.transport)
 
     @app.get("/")
     def index():
