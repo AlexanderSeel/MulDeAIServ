@@ -47,7 +47,7 @@ class BackendRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     model_id: str = Field(min_length=1, max_length=180)
     base_url: str = Field(min_length=10, max_length=300)
-    kind: Literal["vllm", "ollama", "openai-compatible"] = "vllm"
+    kind: Literal["vllm", "ollama", "openai-compatible", "exo", "llama-cpp"] = "vllm"
 
 class PlanRequest(BaseModel):
     model_id: str

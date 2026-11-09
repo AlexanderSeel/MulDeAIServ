@@ -112,7 +112,7 @@ class DeviceStore:
 
     def create_backend(self, name, model_id, origin, kind):
         from .security import MODEL_ID, private_origin
-        if kind not in ("vllm","ollama","openai-compatible"):
+        if kind not in ("vllm","ollama","openai-compatible","exo","llama-cpp"):
             raise ValueError("Unsupported backend type.")
         if not MODEL_ID.fullmatch(model_id):
             raise ValueError("Invalid model ID.")

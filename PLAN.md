@@ -84,3 +84,11 @@ After each coherent batch run Python compileall, pytest and wheel build. Inspect
 - [Current vLLM parallelism guide](https://docs.vllm.ai/en/latest/serving/parallelism_scaling.html)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Manual vLLM runbook](docs/VLLM_RUNBOOK.md)
+
+## Research update — heterogeneous model partitioning (2026-11-09)
+
+- [x] Document technical options in docs/HETEROGENEOUS_ENGINES.md: current exo MLX clusters, llama.cpp RPC and mobile MLC inference.
+- [x] Add metadata types to register existing exo and llama.cpp OpenAI-compatible APIs behind the gateway.
+- [ ] Add version-specific exo setup and cluster health detection; current exo release is Apple silicon/MLX focused and Mac/Linux cluster mixing is documented as unsupported.
+- [ ] Add isolated-network-only llama.cpp RPC setup and security safeguards, plus per-device remote memory accounting.
+- [ ] Implement and benchmark verified Android native RPC/MLC integration; investigate iOS separately.

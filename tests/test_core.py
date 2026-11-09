@@ -67,3 +67,9 @@ def test_backend_registry(tmp_path):
         store.create_backend("Duplicate","model-1","http://127.0.0.1:8002","ollama")
     assert store.delete_backend(backend["id"])
     assert store.backend_for_model("model-1") is None
+
+def test_exo_and_llama_cpp_backend_metadata(tmp_path):
+    store = DeviceStore(tmp_path / 'engines.db')
+    for kind in ('exo', 'llama-cpp'):
+        created = store.create_backend(kind, kind + '-test', 'http://127.0.0.1:8001', kind)
+        assert created['kind'] == kind

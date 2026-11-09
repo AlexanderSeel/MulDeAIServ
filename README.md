@@ -64,3 +64,7 @@ pytest -q
 See [PLAN.md](PLAN.md) for limitations, architecture, platform support and implementation priorities.
 
 Reference: [vLLM 0.7 distributed serving documentation](https://docs.vllm.ai/en/v0.7.0/serving/distributed_serving.html).
+
+## Heterogeneous runtimes
+
+The gateway can also register existing exo and llama.cpp HTTP model servers. These may support distributing parts of a model across supported devices in their own runtimes, but MulDeAIServ **does not yet install or manage their distributed workers**. See [Heterogeneous engine research](docs/HETEROGENEOUS_ENGINES.md). Current exo documentation focuses on compatible Apple silicon/MLX clusters, while llama.cpp RPC remains experimental and warns against open-network use.
