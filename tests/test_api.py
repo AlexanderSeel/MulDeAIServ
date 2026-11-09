@@ -170,3 +170,96 @@ def test_static_dashboard_resources_served(tmp_path):
     c = client(tmp_path)
     assert c.get("/static/app.js").status_code == 200
     assert c.get("/static/styles.css").status_code == 200
+
+
+def test_studio_chat_lifecycle_persists_and_is_private(tmp_path):
+    c = client(tmp_path)
+    created_backend = c.post("/api/backends", headers=HEADERS, json={
+        "name": "Local", "model_id": "studio-model",
+        "base_url": "http://127.0.0.1:8001", "kind": "vllm"
+    })
+    assert created_backend.status_code == 201
+    assert c.post("/api/studio/conversations", headers=HEADERS, json={
+        "title": "Not configured", "model_id": "does-not-exist"
+    }).status_code == 422
+    created = c.post("/api/studio/conversations", headers=HEADERS, json={
+        "title": "Architecture discussion", "model_id": "studio-model",
+        "system_prompt": "Keep answers concise.", "temperature": 0.35
+    })
+    assert created.status_code == 201, created.text
+    chat_id = created.json()["id"]
+
+    assert c.get("/api/studio/conversations").status_code == 401
+    api_key = c.post("/api/inference-keys", headers=HEADERS,
+                     json={"name": "inference only"}).json()["token"]
+    inference_headers = {"Authorization": "Bearer " + api_key}
+    assert c.get("/api/studio/conversations", headers=inference_headers).status_code == 401
+    assert c.get("/api/studio/conversations", headers=HEADERS).json()[0]["title"] == "Architecture discussion"
+
+    for role, content in [("user", "Can I split the model?"),
+                          ("assistant", "Only on supported runtimes."),
+                          ("user", "What about a laptop?")]:
+        saved = c.post(f"/api/studio/conversations/{chat_id}/messages",
+                       headers=HEADERS, json={"role": role, "content": content})
+        assert saved.status_code == 201, saved.text
+
+    chat = c.get(f"/api/studio/conversations/{chat_id}", headers=HEADERS).json()
+    assert [m["role"] for m in chat["messages"]] == ["user", "assistant", "user"]
+    assert chat["messages"][0]["content"] == "Can I split the model?"
+    assert chat["system_prompt"] == "Keep answers concise."
+    assert c.post(f"/api/studio/conversations/{chat_id}/messages",
+                  headers=HEADERS, json={"role": "system", "content": "bad"}).status_code == 422
+    assert c.post(f"/api/studio/conversations/{chat_id}/messages",
+                  headers=HEADERS, json={"role": "assistant", "content": ""}).status_code == 422
+
+    renamed = c.patch(f"/api/studio/conversations/{chat_id}", headers=HEADERS,
+                      json={"title": "Renamed chat", "temperature": 0.9})
+    assert renamed.status_code == 200
+    assert renamed.json()["title"] == "Renamed chat"
+    assert renamed.json()["temperature"] == 0.9
+    assert c.patch(f"/api/studio/conversations/{chat_id}", headers=HEADERS,
+                   json={"title": None}).status_code == 422
+    assert c.patch(f"/api/studio/conversations/{chat_id}", headers=HEADERS,
+                   json={"model_id": "unknown"}).status_code == 422
+    assert c.delete(f"/api/studio/conversations/{chat_id}", headers=HEADERS).status_code == 200
+    assert c.get(f"/api/studio/conversations/{chat_id}", headers=HEADERS).status_code == 404
+    with c.app.state.store.connection() as db:
+        messages = db.execute("SELECT COUNT(*) FROM studio_messages").fetchone()[0]
+    assert messages == 0
+
+
+def test_studio_sessions_survive_controller_restart(tmp_path):
+    db_path = tmp_path / "studio.db"
+    first = TestClient(create_app(db_path=db_path, admin_token=ADMIN))
+    first.post("/api/backends", headers=HEADERS, json={
+        "name": "Local", "model_id": "persistent-model",
+        "base_url": "http://127.0.0.1:8001", "kind": "ollama"
+    })
+    convo = first.post("/api/studio/conversations", headers=HEADERS,
+                       json={"title": "Across restarts", "model_id": "persistent-model"}).json()
+    first.post(f"/api/studio/conversations/{convo['id']}/messages",
+               headers=HEADERS, json={"role": "user", "content": "Are you there?"})
+    restarted = TestClient(create_app(db_path=db_path, admin_token=ADMIN))
+    history = restarted.get(f"/api/studio/conversations/{convo['id']}", headers=HEADERS)
+    assert history.status_code == 200
+    assert history.json()["messages"][0]["content"] == "Are you there?"
+    assert restarted.get("/api/studio/conversations", headers=HEADERS).json()[0]["id"] == convo["id"]
+
+
+def test_studio_rejects_oversized_or_invalid_user_data(tmp_path):
+    c = client(tmp_path)
+    c.post("/api/backends", headers=HEADERS, json={
+        "name": "Local", "model_id": "m",
+        "base_url": "http://127.0.0.1:8001", "kind": "vllm"
+    })
+    assert c.post("/api/studio/conversations", headers=HEADERS, json={
+        "title": "X", "model_id": "m", "system_prompt": "a" * 8001
+    }).status_code == 422
+    conversation = c.post("/api/studio/conversations", headers=HEADERS,
+                          json={"title": "SQL ' test", "model_id": "m"}).json()
+    chat_id = conversation["id"]
+    assert c.post(f"/api/studio/conversations/{chat_id}/messages", headers=HEADERS,
+                  json={"role": "user", "content": "x" * 32769}).status_code == 422
+    assert c.post("/api/studio/conversations/unknown/messages", headers=HEADERS,
+                  json={"role": "user", "content": "hello"}).status_code == 404
+    assert c.get("/api/studio/conversations/unknown", headers=HEADERS).status_code == 404
