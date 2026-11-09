@@ -1,0 +1,10 @@
+{
+  "name": "MulDeAIServ — AI Cluster",
+  "short_name": "MulDeAIServ",
+  "description": "Manage your private distributed AI infrastructure",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090e1c",
+  "theme_color": "#0b1020",
+  "icons": []
+}
