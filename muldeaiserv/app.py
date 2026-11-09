@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .diagnostics import collect_runtime
 from .gateway import backend_health, forward_chat
 from .planner import make_plan
 from .rpc_planner import plan_rpc
@@ -24,6 +25,20 @@ class GPU(BaseModel):
     vendor: str = Field(min_length=1, max_length=40)
     memory_mb: int = Field(ge=0, le=2000000)
 
+class RuntimeInfo(BaseModel):
+    python_version: str | None = Field(default=None, max_length=120)
+    cuda_driver: str | None = Field(default=None, max_length=120)
+    vllm_version: str | None = Field(default=None, max_length=120)
+    ray_version: str | None = Field(default=None, max_length=120)
+    docker_present: bool = False
+    docker_version: str | None = Field(default=None, max_length=120)
+    nvidia_smi_present: bool = False
+    ollama_present: bool = False
+    llama_server_present: bool = False
+    rpc_server_present: bool = False
+    exo_present: bool = False
+    disk_free_mb: int = Field(default=0, ge=0, le=1000000000)
+
 class Hardware(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     platform: Literal["windows", "linux", "darwin", "android", "ios", "other"]
@@ -31,6 +46,7 @@ class Hardware(BaseModel):
     cpu_count: int = Field(ge=0, le=4096)
     ram_mb: int = Field(ge=0, le=100000000)
     gpus: list[GPU] = Field(max_length=128)
+    runtime: RuntimeInfo = Field(default_factory=RuntimeInfo)
 
 class Enrollment(BaseModel):
     join_token: str = Field(min_length=24, max_length=256)
@@ -105,6 +121,7 @@ def create_app(db_path=None, admin_token=None, transport=None):
         return {"os": platform.platform(), "python": sys.version.split()[0],
                 "docker": bool(shutil.which("docker")), "ray": bool(shutil.which("ray")),
                 "vllm": bool(shutil.which("vllm")), "nvidia_smi": bool(shutil.which("nvidia-smi")),
+                "runtime": collect_runtime(),
                 "note": "These checks describe the controller host only. They do not install or configure GPU runtimes."}
 
     @app.post("/api/join-tokens", dependencies=[Depends(require_admin)])

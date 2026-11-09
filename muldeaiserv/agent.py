@@ -13,6 +13,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from .diagnostics import collect_runtime
+
 CONFIG = Path.home() / ".config" / "muldeaiserv" / "agent.json"
 
 def ram_mb():
@@ -55,7 +57,7 @@ def probe(name=None):
     return {"name": name or socket.gethostname(), "platform":system if system in
             ("windows","linux","darwin") else "other",
             "os_version":platform.platform()[:240], "cpu_count":os.cpu_count() or 0,
-            "ram_mb":ram_mb(), "gpus":gpus}
+            "ram_mb":ram_mb(), "gpus":gpus, "runtime":collect_runtime()}
 
 def safe_server_url(server, allow_insecure_lan=False):
     parsed = urlsplit(server)

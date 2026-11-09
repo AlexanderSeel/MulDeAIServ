@@ -16,8 +16,10 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.command == "doctor":
         from .agent import probe
-        from .app import create_app
-        print("Hardware:", probe())
+        from .diagnostics import readiness
+        hardware = probe()
+        print("Hardware:", hardware)
+        print("Readiness:", readiness({**hardware, "online": True}))
         for name in ("docker", "nvidia-smi", "ray", "vllm"):
             print(name + ":", shutil.which(name) or "not found (optional for controller)")
         print("Controller:", "FastAPI package installed")

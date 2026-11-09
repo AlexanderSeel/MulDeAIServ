@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .security import digest, verify
+from .diagnostics import readiness
 
 HEARTBEAT_TIMEOUT = 75
 
@@ -23,7 +24,7 @@ class DeviceStore:
                     os_version TEXT NOT NULL,cpu_count INTEGER NOT NULL,
                     ram_mb INTEGER NOT NULL,gpus TEXT NOT NULL,
                     agent_digest TEXT NOT NULL,created REAL NOT NULL,
-                    seen REAL NOT NULL);
+                    seen REAL NOT NULL,runtime TEXT NOT NULL DEFAULT '{}');
                 CREATE TABLE IF NOT EXISTS backends(
                     id TEXT PRIMARY KEY,name TEXT NOT NULL,model_id TEXT NOT NULL UNIQUE,
                     base_url TEXT NOT NULL,kind TEXT NOT NULL,created REAL NOT NULL);
@@ -31,6 +32,10 @@ class DeviceStore:
                     id TEXT PRIMARY KEY,name TEXT NOT NULL,digest TEXT NOT NULL UNIQUE,
                     prefix TEXT NOT NULL,created REAL NOT NULL);
             """)
+            # The original v0.1 SQLite tables did not include runtime diagnostics.
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(devices)")}
+            if "runtime" not in columns:
+                db.execute("ALTER TABLE devices ADD COLUMN runtime TEXT NOT NULL DEFAULT '{}'")
 
     @contextmanager
     def connection(self):
@@ -66,10 +71,12 @@ class DeviceStore:
                 raise ValueError("Join token expired, used or invalid.")
             db.execute("UPDATE joins SET used=? WHERE digest=?", (now, digest(join_token)))
             db.execute(
-                "INSERT INTO devices VALUES(?,?,?,?,?,?,?,?,?,?)",
+                """INSERT INTO devices
+                   (id,name,platform,os_version,cpu_count,ram_mb,gpus,agent_digest,created,seen,runtime)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (identifier, hw["name"],hw["platform"],hw["os_version"],
                  hw["cpu_count"],hw["ram_mb"],json.dumps(hw["gpus"]),
-                 digest(bearer),now,now))
+                 digest(bearer),now,now,json.dumps(hw.get("runtime") or {})))
         return {"device_id":identifier,"agent_token":bearer,"heartbeat_interval_seconds":20}
 
     def heartbeat(self, identifier, bearer, hw):
@@ -79,19 +86,26 @@ class DeviceStore:
                 return False
             db.execute(
                 """UPDATE devices SET name=?,platform=?,os_version=?,cpu_count=?,
-                    ram_mb=?,gpus=?,seen=? WHERE id=?""",
+                    ram_mb=?,gpus=?,runtime=?,seen=? WHERE id=?""",
                 (hw["name"],hw["platform"],hw["os_version"],hw["cpu_count"],
-                 hw["ram_mb"],json.dumps(hw["gpus"]),time.time(),identifier))
+                 hw["ram_mb"],json.dumps(hw["gpus"]),json.dumps(hw.get("runtime") or {}),
+                 time.time(),identifier))
         return True
 
     def devices(self):
         with self.connection() as db:
             rows = db.execute(
-                "SELECT id,name,platform,os_version,cpu_count,ram_mb,gpus,created,seen FROM devices ORDER BY name,id"
+                "SELECT id,name,platform,os_version,cpu_count,ram_mb,gpus,created,seen,runtime FROM devices ORDER BY name,id"
             ).fetchall()
         now = time.time()
-        return [{**dict(row),"gpus":json.loads(row["gpus"]),
-                 "online":now-row["seen"] <= HEARTBEAT_TIMEOUT} for row in rows]
+        devices = []
+        for row in rows:
+            item = {**dict(row), "gpus": json.loads(row["gpus"]),
+                    "runtime": json.loads(row["runtime"] or "{}"),
+                    "online": now-row["seen"] <= HEARTBEAT_TIMEOUT}
+            item["readiness"] = readiness(item)
+            devices.append(item)
+        return devices
 
     def overview(self):
         devices = self.devices()
