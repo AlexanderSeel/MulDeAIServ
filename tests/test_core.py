@@ -148,7 +148,7 @@ def test_nvidia_gpu_query_with_free_memory(monkeypatch):
     from muldeaiserv.agent import nvidia_gpus
     from types import SimpleNamespace
     monkeypatch.setattr("muldeaiserv.agent.subprocess.run",lambda *a,**kw:
-                        SimpleNamespace(stdout="NVIDIA GPU, 12288, 8192, 33\\n"))
+                        SimpleNamespace(stdout="NVIDIA GPU, 12288, 8192, 33\n"))
     gpus = nvidia_gpus()
     assert len(gpus) == 1
     assert gpus[0]["memory_mb"] == 12288
